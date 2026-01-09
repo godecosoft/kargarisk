@@ -90,3 +90,19 @@ export async function fetchReportsStats(startDate, endDate) {
 
     return response.json();
 }
+
+export async function fetchRules() {
+    const response = await fetch(`${API_BASE}/rules`);
+    if (!response.ok) throw new Error('Failed to fetch rules');
+    return response.json();
+}
+
+export async function saveRule(key, value, description) {
+    const response = await fetch(`${API_BASE}/rules`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value, description })
+    });
+    if (!response.ok) throw new Error('Failed to save rule');
+    return response.json();
+}

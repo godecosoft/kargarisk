@@ -162,11 +162,19 @@ function calculateTurnover(transactions, afterTime, requiredAmount, multiplier =
     };
 }
 
+const rulesService = require('./rulesService');
+
 /**
  * Tam çevrim raporu al
  */
-async function getTurnoverReport(clientId, multiplier = 1) {
+async function getTurnoverReport(clientId, multiplier = null) {
     try {
+        // Get multiplier from rules if not provided
+        if (multiplier === null) {
+            multiplier = await rulesService.getRule('turnover_multiplier', 1);
+            // Ensure it's a number (in case stored as string)
+            multiplier = parseFloat(multiplier);
+        }
         // Son 2 günlük işlemleri al
         const transactions = await getClientTransactions(clientId, 2);
 

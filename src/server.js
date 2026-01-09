@@ -248,6 +248,38 @@ app.get('/api/reports/stats', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/rules
+ * Tüm kuralları getir
+ */
+app.get('/api/rules', async (req, res) => {
+    try {
+        const rulesService = require('./services/rulesService');
+        const rules = await rulesService.getAllRules();
+        res.json({ success: true, rules });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST /api/rules
+ * Kural güncelle
+ */
+app.post('/api/rules', async (req, res) => {
+    try {
+        const rulesService = require('./services/rulesService');
+        const { key, value, description } = req.body;
+
+        if (!key) return res.status(400).json({ error: 'Key required' });
+
+        await rulesService.setRule(key, value, description);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // SPA fallback - serve index.html for non-API routes
 app.use((req, res, next) => {
     // Skip API routes

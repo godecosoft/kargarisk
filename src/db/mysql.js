@@ -101,7 +101,17 @@ async function runMigrations() {
             if (e.errno !== 1060) console.error('[DB] Migration column warning:', e.message);
         }
 
-        console.log('[DB] Migrations completed - decisions tablosu hazır');
+        // Rules table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS rules (
+                rule_key VARCHAR(50) PRIMARY KEY,
+                rule_value JSON NOT NULL,
+                description VARCHAR(255),
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
+
+        console.log('[DB] Migrations completed - decisions ve rules tabloları hazır');
     } catch (error) {
         console.error('[DB] Migration hatası:', error.message);
     }
