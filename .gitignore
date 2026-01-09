@@ -1,0 +1,8 @@
+# Dependencies
+node_modules/
+
+# Runtime data
+data/auth_token.txt
+
+# Logs
+*.log

@@ -1,0 +1,253 @@
+/**
+ * Decision Service
+ * Manages auto-control decisions with database persistence
+ */
+
+const db = require('../db/mysql');
+const turnoverService = require('./turnoverService');
+const sportsService = require('./sportsService');
+
+/**
+ * Get decision for a withdrawal
+ * Returns cached decision if exists and deposit hasn't changed
+ */
+async function getDecision(withdrawalId, clientId) {
+    try {
+        const pool = db.getPool();
+        if (!pool) {
+            // No database - calculate on the fly
+            return await calculateDecision(clientId, null);
+        }
+
+        // Check if decision exists
+        const [rows] = await pool.query(
+            'SELECT * FROM decisions WHERE withdrawal_id = ?',
+            [withdrawalId]
+        );
+
+        if (rows.length > 0) {
+            const existing = rows[0];
+
+            // Check if deposit changed (would require recalculation)
+            const currentDeposit = await turnoverService.getLastDeposit(clientId);
+            const depositChanged = currentDeposit &&
+                existing.deposit_time &&
+                new Date(currentDeposit.time).getTime() !== new Date(existing.deposit_time).getTime();
+
+            if (!depositChanged) {
+                // Return cached decision
+                return {
+                    decision: existing.decision,
+                    reason: existing.decision_reason,
+                    fromCache: true,
+                    checkedAt: existing.checked_at
+                };
+            }
+        }
+
+        // Calculate new decision
+        return await calculateAndSaveDecision(withdrawalId, clientId, null);
+    } catch (error) {
+        console.error('[DecisionService] getDecision error:', error.message);
+        // Fallback to calculation without saving
+        return await calculateDecision(clientId, null);
+    }
+}
+
+/**
+ * Get decisions for multiple withdrawals in batch
+ */
+async function getDecisionsBatch(withdrawals) {
+    const results = {};
+
+    try {
+        const pool = db.getPool();
+
+        if (!pool) {
+            // No database - calculate all
+            for (const w of withdrawals) {
+                if (w.State === 0) { // Only for "New" status
+                    const decision = await calculateDecision(w.ClientId, w.Amount);
+                    results[w.Id] = decision;
+                }
+            }
+            return results;
+        }
+
+        // Get all existing decisions
+        const withdrawalIds = withdrawals.filter(w => w.State === 0).map(w => w.Id);
+
+        if (withdrawalIds.length === 0) {
+            return results;
+        }
+
+        const [existingRows] = await pool.query(
+            'SELECT * FROM decisions WHERE withdrawal_id IN (?)',
+            [withdrawalIds]
+        );
+
+        const existingMap = new Map(existingRows.map(r => [r.withdrawal_id, r]));
+
+        // Process each withdrawal
+        for (const w of withdrawals) {
+            if (w.State !== 0) continue; // Skip non-new
+
+            const existing = existingMap.get(w.Id);
+
+            if (existing) {
+                // Check if deposit changed
+                const currentDeposit = await turnoverService.getLastDeposit(w.ClientId);
+                const depositChanged = currentDeposit &&
+                    existing.deposit_time &&
+                    new Date(currentDeposit.time).getTime() !== new Date(existing.deposit_time).getTime();
+
+                if (!depositChanged) {
+                    results[w.Id] = {
+                        decision: existing.decision,
+                        reason: existing.decision_reason,
+                        fromCache: true,
+                        checkedAt: existing.checked_at
+                    };
+                    continue;
+                }
+            }
+
+            // Calculate and save new decision
+            const decision = await calculateAndSaveDecision(w.Id, w.ClientId, w.Amount);
+            results[w.Id] = decision;
+        }
+
+        return results;
+    } catch (error) {
+        console.error('[DecisionService] getDecisionsBatch error:', error.message);
+        return results;
+    }
+}
+
+/**
+ * Calculate decision based on turnover and sports data
+ */
+async function calculateDecision(clientId, withdrawalAmount) {
+    try {
+        // Get turnover report
+        const turnoverReport = await turnoverService.getTurnoverReport(clientId);
+
+        // Get sports report for pre-deposit winning check
+        let sportsReport = null;
+        try {
+            sportsReport = await sportsService.getSportsReport(
+                clientId,
+                turnoverReport.deposit?.time
+            );
+        } catch (e) {
+            console.log('[DecisionService] Sports check skipped:', e.message);
+        }
+
+        // Determine decision
+        let decision = turnoverReport.decision || 'MANUEL';
+        let reason = turnoverReport.decisionReason || 'Hesaplanamadı';
+
+        // Override to MANUEL if pre-deposit winning found
+        if (sportsReport?.hasPreDepositWinning) {
+            decision = 'MANUEL';
+            reason = 'Yatırım öncesi kazançlı spor kuponu tespit edildi';
+        }
+
+        return {
+            decision,
+            reason,
+            fromCache: false,
+            turnover: turnoverReport.turnover,
+            deposit: turnoverReport.deposit,
+            hasPreDepositWin: sportsReport?.hasPreDepositWinning || false
+        };
+    } catch (error) {
+        console.error('[DecisionService] calculateDecision error:', error.message);
+        return {
+            decision: 'MANUEL',
+            reason: 'Hesaplama hatası: ' + error.message,
+            fromCache: false
+        };
+    }
+}
+
+/**
+ * Calculate and save decision to database
+ */
+async function calculateAndSaveDecision(withdrawalId, clientId, withdrawalAmount) {
+    const result = await calculateDecision(clientId, withdrawalAmount);
+
+    try {
+        const pool = db.getPool();
+        if (!pool) return result;
+
+        await pool.query(`
+            INSERT INTO decisions (
+                withdrawal_id, client_id, decision, decision_reason,
+                deposit_amount, deposit_time,
+                turnover_casino, turnover_sports, turnover_required, turnover_percentage,
+                has_pre_deposit_win, withdrawal_amount, checked_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ON DUPLICATE KEY UPDATE
+                decision = VALUES(decision),
+                decision_reason = VALUES(decision_reason),
+                deposit_amount = VALUES(deposit_amount),
+                deposit_time = VALUES(deposit_time),
+                turnover_casino = VALUES(turnover_casino),
+                turnover_sports = VALUES(turnover_sports),
+                turnover_required = VALUES(turnover_required),
+                turnover_percentage = VALUES(turnover_percentage),
+                has_pre_deposit_win = VALUES(has_pre_deposit_win),
+                withdrawal_amount = VALUES(withdrawal_amount),
+                checked_at = NOW()
+        `, [
+            withdrawalId,
+            clientId,
+            result.decision,
+            result.reason,
+            result.deposit?.amount || null,
+            result.deposit?.time ? new Date(result.deposit.time) : null,
+            result.turnover?.casino?.amount || 0,
+            result.turnover?.sports?.amount || 0,
+            result.turnover?.required || 0,
+            result.turnover?.total?.percentage || 0,
+            result.hasPreDepositWin || false,
+            withdrawalAmount
+        ]);
+
+        console.log(`[DecisionService] Karar kaydedildi: withdrawal=${withdrawalId}, decision=${result.decision}`);
+    } catch (error) {
+        console.error('[DecisionService] Save error:', error.message);
+    }
+
+    return result;
+}
+
+/**
+ * Get decision history for a client
+ */
+async function getClientHistory(clientId, limit = 20) {
+    try {
+        const pool = db.getPool();
+        if (!pool) return [];
+
+        const [rows] = await pool.query(`
+            SELECT * FROM decisions 
+            WHERE client_id = ? 
+            ORDER BY checked_at DESC 
+            LIMIT ?
+        `, [clientId, limit]);
+
+        return rows;
+    } catch (error) {
+        console.error('[DecisionService] getClientHistory error:', error.message);
+        return [];
+    }
+}
+
+module.exports = {
+    getDecision,
+    getDecisionsBatch,
+    calculateDecision,
+    getClientHistory
+};
