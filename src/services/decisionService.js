@@ -46,7 +46,10 @@ async function getDecision(withdrawalId, clientId) {
         }
 
         // Calculate new decision
-        return await calculateAndSaveDecision(withdrawalId, clientId, null);
+        // Note: We don't have full withdrawal object here easily, passing null for now
+        // Ideally getDecision should take full withdrawal object too, but for backward compat
+        // we'll fetch details if needed, or simply let batch API handle the main flow.
+        return await calculateAndSaveDecision(withdrawalId, clientId, null, null);
     } catch (error) {
         console.error('[DecisionService] getDecision error:', error.message || error);
         // Fallback to calculation without saving
@@ -113,7 +116,8 @@ async function getDecisionsBatch(withdrawals) {
             }
 
             // Calculate and save new decision
-            const decision = await calculateAndSaveDecision(w.Id, w.ClientId, w.Amount);
+            // Pass full withdrawal object for audit logging
+            const decision = await calculateAndSaveDecision(w.Id, w.ClientId, w.Amount, w);
             results[w.Id] = decision;
         }
 
@@ -131,6 +135,9 @@ async function calculateDecision(clientId, withdrawalAmount) {
     try {
         // Get turnover report
         const turnoverReport = await turnoverService.getTurnoverReport(clientId);
+
+        // Return report for audit logging
+        turnoverReport.fullReport = true; // Marker if needed
 
         // Get sports report for pre-deposit winning check
         let sportsReport = null;
@@ -159,7 +166,10 @@ async function calculateDecision(clientId, withdrawalAmount) {
             fromCache: false,
             turnover: turnoverReport.turnover,
             deposit: turnoverReport.deposit,
-            hasPreDepositWin: sportsReport?.hasPreDepositWinning || false
+            hasPreDepositWin: sportsReport?.hasPreDepositWinning || false,
+            // Return full report data for logging
+            turnoverReport: turnoverReport,
+            sportsReport: sportsReport
         };
     } catch (error) {
         console.error('[DecisionService] calculateDecision error:', error.message);
@@ -174,7 +184,10 @@ async function calculateDecision(clientId, withdrawalAmount) {
 /**
  * Calculate and save decision to database
  */
-async function calculateAndSaveDecision(withdrawalId, clientId, withdrawalAmount) {
+/**
+ * Calculate and save decision to database
+ */
+async function calculateAndSaveDecision(withdrawalId, clientId, withdrawalAmount, withdrawalObject = null) {
     const result = await calculateDecision(clientId, withdrawalAmount);
 
     try {
@@ -186,8 +199,10 @@ async function calculateAndSaveDecision(withdrawalId, clientId, withdrawalAmount
                 withdrawal_id, client_id, decision, decision_reason,
                 deposit_amount, deposit_time,
                 turnover_casino, turnover_sports, turnover_required, turnover_percentage,
-                has_pre_deposit_win, withdrawal_amount, checked_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                has_pre_deposit_win, withdrawal_amount, 
+                withdrawal_data, turnover_data,
+                checked_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ON DUPLICATE KEY UPDATE
                 decision = VALUES(decision),
                 decision_reason = VALUES(decision_reason),
@@ -199,6 +214,8 @@ async function calculateAndSaveDecision(withdrawalId, clientId, withdrawalAmount
                 turnover_percentage = VALUES(turnover_percentage),
                 has_pre_deposit_win = VALUES(has_pre_deposit_win),
                 withdrawal_amount = VALUES(withdrawal_amount),
+                withdrawal_data = VALUES(withdrawal_data),
+                turnover_data = VALUES(turnover_data),
                 checked_at = NOW()
         `, [
             withdrawalId,
@@ -212,7 +229,9 @@ async function calculateAndSaveDecision(withdrawalId, clientId, withdrawalAmount
             result.turnover?.required || 0,
             result.turnover?.total?.percentage || 0,
             result.hasPreDepositWin || false,
-            withdrawalAmount
+            withdrawalAmount,
+            withdrawalObject ? JSON.stringify(withdrawalObject) : null,
+            JSON.stringify({ turnover: result.turnoverReport, sports: result.sportsReport })
         ]);
 
         console.log(`[DecisionService] Karar kaydedildi: withdrawal=${withdrawalId}, decision=${result.decision}`);

@@ -83,6 +83,24 @@ async function runMigrations() {
 
     try {
         await pool.query(createDecisionsTable);
+
+        // Add JSON columns for audit logging (idempotent check via try-catch)
+        // Note: IF NOT EXISTS for columns is only available in newer MySQL/MariaDB versions,
+        // so we try to add and ignore "Duplicate column name" error (errno 1060)
+        try {
+            await pool.query('ALTER TABLE decisions ADD COLUMN withdrawal_data JSON');
+        } catch (e) {
+            // Ignore if column exists
+            if (e.errno !== 1060) console.error('[DB] Migration column warning:', e.message);
+        }
+
+        try {
+            await pool.query('ALTER TABLE decisions ADD COLUMN turnover_data JSON');
+        } catch (e) {
+            // Ignore if column exists
+            if (e.errno !== 1060) console.error('[DB] Migration column warning:', e.message);
+        }
+
         console.log('[DB] Migrations completed - decisions tablosu hazır');
     } catch (error) {
         console.error('[DB] Migration hatası:', error.message);
