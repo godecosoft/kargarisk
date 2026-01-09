@@ -42,7 +42,8 @@ async function initDatabase() {
 
         return pool;
     } catch (error) {
-        console.error('[DB] MySQL bağlantı hatası:', error.message);
+        console.error('[DB] MySQL bağlantı hatası:', error.message || error);
+        pool = null; // Reset pool on error
         // Don't crash - allow app to run without DB for development
         return null;
     }

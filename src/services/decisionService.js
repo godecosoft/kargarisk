@@ -48,7 +48,7 @@ async function getDecision(withdrawalId, clientId) {
         // Calculate new decision
         return await calculateAndSaveDecision(withdrawalId, clientId, null);
     } catch (error) {
-        console.error('[DecisionService] getDecision error:', error.message);
+        console.error('[DecisionService] getDecision error:', error.message || error);
         // Fallback to calculation without saving
         return await calculateDecision(clientId, null);
     }
@@ -119,7 +119,7 @@ async function getDecisionsBatch(withdrawals) {
 
         return results;
     } catch (error) {
-        console.error('[DecisionService] getDecisionsBatch error:', error.message);
+        console.error('[DecisionService] getDecisionsBatch error:', error.message || error);
         return results;
     }
 }
