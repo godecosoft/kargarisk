@@ -132,13 +132,9 @@ function WithdrawalsPage({ onViewDetail }) {
     // Fetch decisions for new withdrawals using batch API
     useEffect(() => {
         const loadDecisions = async () => {
-            // Only examine 'Pending/New' withdrawals (State === 0)
-            const newWithdrawals = withdrawals.filter(w => w.State === 0);
-            if (newWithdrawals.length === 0) return;
-
-            // Filter out withdrawals that already have a decision (to prevent re-loading/flicker)
-            // User requested: "her çekim 1 kere kontrol edilsin"
-            const withdrawalsToFetch = newWithdrawals.filter(w => !decisions[w.Id]);
+            // Fetch decisions for ALL visible withdrawals (not just 'New')
+            // This ensures historical decisions are shown even after page reload/redeploy
+            const withdrawalsToFetch = withdrawals.filter(w => !decisions[w.Id]);
 
             if (withdrawalsToFetch.length === 0) return;
 
@@ -162,6 +158,7 @@ function WithdrawalsPage({ onViewDetail }) {
                     Object.entries(result.decisions).forEach(([id, data]) => {
                         newDecisions[id] = {
                             decision: data.decision,
+                            reason: data.reason,
                             loading: false,
                             fromCache: data.fromCache
                         };
@@ -504,8 +501,8 @@ function WithdrawalsPage({ onViewDetail }) {
                                         </td>
                                         <td>
                                             <DecisionBadge
-                                                decision={w.State === 0 ? decisions[w.Id]?.decision : null}
-                                                loading={w.State === 0 ? decisions[w.Id]?.loading : false}
+                                                decision={decisions[w.Id]?.decision}
+                                                loading={decisions[w.Id]?.loading}
                                                 isChecking={checkingId === w.Id}
                                             />
                                         </td>
@@ -520,7 +517,7 @@ function WithdrawalsPage({ onViewDetail }) {
                                                 <button
                                                     className="action-btn view"
                                                     title="Detay"
-                                                    onClick={() => onViewDetail && onViewDetail(w)}
+                                                    onClick={() => onViewDetail && onViewDetail({ ...w, decisionData: decisions[w.Id] })}
                                                 >
                                                     <Eye />
                                                 </button>

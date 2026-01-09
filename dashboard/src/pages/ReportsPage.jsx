@@ -8,7 +8,9 @@ import {
     ShieldAlert,
     TrendingUp,
     Banknote,
-    Loader2
+    Loader2,
+    RefreshCw,
+    Download
 } from 'lucide-react';
 import { fetchReportsStats } from '../services/api';
 
@@ -35,9 +37,6 @@ function ReportsPage() {
                 start.setDate(start.getDate() - 7);
             }
 
-            // Format for API (client-side formatting or just pass ISO)
-            // reportsService expects formatted strings usually for BC, 
-            // but let's pass formatting string: DD-MM-YY - HH:mm:ss
             const formatDate = (d, isEnd = false) => {
                 const dd = String(d.getDate()).padStart(2, '0');
                 const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -64,165 +63,201 @@ function ReportsPage() {
 
     if (loading && !stats) {
         return (
-            <div className="flex items-center justify-center h-full">
-                <Loader2 className="animate-spin text-purple-500" size={48} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                <Loader2 className="spinner" size={48} />
             </div>
         );
     }
 
     return (
-        <div className="p-6">
+        <>
             {/* Header */}
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                    <BarChart3 className="text-purple-500" />
-                    Raporlar ve Analizler
-                </h1>
+            <div className="page-header">
+                <div>
+                    <h1 className="page-title">Raporlar ve Analizler</h1>
+                    <p className="page-subtitle">Çekim istatistikleri ve bot performans analizi</p>
+                </div>
 
-                <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700">
-                    <button
-                        onClick={() => setDateRange('today')}
-                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${dateRange === 'today' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                    >
-                        Bugün
-                    </button>
-                    <button
-                        onClick={() => setDateRange('yesterday')}
-                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${dateRange === 'yesterday' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                    >
-                        Dün
-                    </button>
-                    <button
-                        onClick={() => setDateRange('week')}
-                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${dateRange === 'week' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                    >
-                        Son 7 Gün
-                    </button>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                    <div className="filter-bar" style={{ marginBottom: 0, padding: '4px 8px' }}>
+                        <button
+                            className={`filter-btn ${dateRange === 'today' ? '' : 'secondary'}`}
+                            onClick={() => setDateRange('today')}
+                        >
+                            Bugün
+                        </button>
+                        <button
+                            className={`filter-btn ${dateRange === 'yesterday' ? '' : 'secondary'}`}
+                            onClick={() => setDateRange('yesterday')}
+                        >
+                            Dün
+                        </button>
+                        <button
+                            className={`filter-btn ${dateRange === 'week' ? '' : 'secondary'}`}
+                            onClick={() => setDateRange('week')}
+                        >
+                            Son 7 Gün
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <KPICard title="Toplam Talep" value={stats?.total || 0} icon={TrendingUp} color="blue" />
-                <KPICard title="Ödenen" value={stats?.paid || 0} icon={CheckCircle} color="green" />
-                <KPICard title="Reddedilen" value={stats?.rejected || 0} icon={XCircle} color="red" />
+            {/* KPI Grid 1 - General Stats */}
+            <div className="kpi-grid">
+                <KPICard
+                    label="Toplam Talep"
+                    value={stats?.total || 0}
+                    icon={TrendingUp}
+                    iconType="info"
+                />
+                <KPICard
+                    label="Ödenen"
+                    value={stats?.paid || 0}
+                    icon={CheckCircle}
+                    iconType="success"
+                />
+                <KPICard
+                    label="Reddedilen"
+                    value={stats?.rejected || 0}
+                    icon={XCircle}
+                    iconType="danger"
+                />
+                <KPICard
+                    label="Bekleyen"
+                    value={stats?.pending || 0}
+                    icon={Loader2}
+                    iconType="warning"
+                />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                <KPICard title="Bot Onayı" value={stats?.botApproved || 0} icon={ShieldAlert} color="green" subtitle="Bot tarafından onaylanan" />
-                <KPICard title="Bot Reddi" value={stats?.botRejected || 0} icon={ShieldAlert} color="red" subtitle="Bot tarafından reddedilen" />
-                <KPICard title="Bot Manuel" value={stats?.botManual || 0} icon={AlertTriangle} color="yellow" subtitle="Bot manuele düşürdü" />
+            {/* KPI Grid 2 - Bot Performance */}
+            <div className="kpi-grid">
+                <KPICard
+                    label="Bot Onayı"
+                    value={stats?.botApproved || 0}
+                    icon={ShieldAlert}
+                    iconType="success"
+                />
+                <KPICard
+                    label="Bot Reddi"
+                    value={stats?.botRejected || 0}
+                    icon={ShieldAlert}
+                    iconType="danger"
+                />
+                <KPICard
+                    label="Bot Manuel"
+                    value={stats?.botManual || 0}
+                    icon={AlertTriangle}
+                    iconType="warning"
+                />
+                <KPICard
+                    label="Bot Başarısı"
+                    value={`%${stats?.total ? Math.round(((stats?.botApproved + stats?.botRejected) / stats?.total) * 100) : 0}`}
+                    icon={TrendingUp}
+                    iconType="info"
+                />
             </div>
 
             {/* Conflicts Analysis */}
-            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                <AlertTriangle className="text-orange-500" />
-                Bot vs İnsan Karar Çatışmaları
-            </h2>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', gap: '24px', marginTop: '24px' }}>
 
                 {/* Critical Conflict: Paid but Bot Rejected */}
-                <ConflictTable
-                    title="KRİTİK: Panel Ödemiş vs Bot Reddetmiş"
-                    items={stats?.conflicts?.paidButBotRejected || []}
-                    type="critical"
-                    description="Botun risk görüp RED verdiği ancak panelde ÖDENEN işlemler."
-                />
+                <div className="card">
+                    <div className="card-header" style={{ borderBottomColor: 'var(--status-rejected)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <AlertTriangle color="var(--status-rejected)" size={20} />
+                            <div>
+                                <h3 className="card-title" style={{ color: 'var(--status-rejected)' }}>KRİTİK: Panel Ödemiş vs Bot Reddetmiş</h3>
+                                <p className="page-subtitle">Botun risk görüp RED verdiği ancak panelde ÖDENEN işlemler</p>
+                            </div>
+                        </div>
+                        <span className="status-badge rejected">{stats?.conflicts?.paidButBotRejected?.length || 0} Adet</span>
+                    </div>
+                    <div className="data-table-wrapper" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                        <ConflictTable items={stats?.conflicts?.paidButBotRejected || []} />
+                    </div>
+                </div>
 
                 {/* Warning Conflict: Rejected but Bot Approved */}
-                <ConflictTable
-                    title="UYARI: Panel Reddetmiş vs Bot Onaylamış"
-                    items={stats?.conflicts?.rejectedButBotApproved || []}
-                    type="warning"
-                    description="Botun temiz bulduğu ancak panelde REDDEDİLEN işlemler."
-                />
+                <div className="card">
+                    <div className="card-header" style={{ borderBottomColor: 'var(--status-pending)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <AlertTriangle color="var(--status-pending)" size={20} />
+                            <div>
+                                <h3 className="card-title" style={{ color: 'var(--status-pending)' }}>UYARI: Panel Reddetmiş vs Bot Onaylamış</h3>
+                                <p className="page-subtitle">Botun temiz bulduğu ancak panelde REDDEDİLEN işlemler</p>
+                            </div>
+                        </div>
+                        <span className="status-badge pending">{stats?.conflicts?.rejectedButBotApproved?.length || 0} Adet</span>
+                    </div>
+                    <div className="data-table-wrapper" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                        <ConflictTable items={stats?.conflicts?.rejectedButBotApproved || []} />
+                    </div>
+                </div>
 
+            </div>
+        </>
+    );
+}
+
+function KPICard({ label, value, icon: Icon, iconType }) {
+    return (
+        <div className="kpi-card">
+            <div className="kpi-header">
+                <span className="kpi-label">{label}</span>
+                <div className={`kpi-icon ${iconType}`}>
+                    <Icon />
+                </div>
+            </div>
+            <div className="kpi-value">
+                {value}
             </div>
         </div>
     );
 }
 
-function KPICard({ title, value, icon: Icon, color, subtitle }) {
-    const colors = {
-        blue: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-        green: 'bg-green-500/10 text-green-500 border-green-500/20',
-        red: 'bg-red-500/10 text-red-500 border-red-500/20',
-        yellow: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
-    };
+function ConflictTable({ items }) {
+    if (items.length === 0) {
+        return (
+            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                Çatışma bulunamadı. Sistem uyumlu çalışıyor.
+            </div>
+        );
+    }
 
     return (
-        <div className={`p-5 rounded-xl border ${colors[color]} backdrop-blur-sm`}>
-            <div className="flex justify-between items-start">
-                <div>
-                    <div className="text-sm font-medium opacity-80 mb-1">{title}</div>
-                    <div className="text-2xl font-bold">{value}</div>
-                    {subtitle && <div className="text-xs opacity-60 mt-1">{subtitle}</div>}
-                </div>
-                <div className={`p-2 rounded-lg bg-opacity-20 ${colors[color].split(' ')[0]}`}>
-                    <Icon size={24} />
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function ConflictTable({ title, items, type, description }) {
-    const isCritical = type === 'critical';
-
-    return (
-        <div className={`rounded-xl border overflow-hidden ${isCritical ? 'border-red-500/30 bg-red-900/10' : 'border-yellow-500/30 bg-yellow-900/10'}`}>
-            <div className={`px-4 py-3 border-b flex justify-between items-center ${isCritical ? 'border-red-500/30 bg-red-500/10' : 'border-yellow-500/30 bg-yellow-500/10'}`}>
-                <div>
-                    <h3 className={`font-bold ${isCritical ? 'text-red-400' : 'text-yellow-400'}`}>{title}</h3>
-                    <div className="text-xs opacity-70 text-slate-300">{description}</div>
-                </div>
-                <div className={`px-2 py-1 rounded text-xs font-bold ${isCritical ? 'bg-red-500 text-white' : 'bg-yellow-500 text-black'}`}>
-                    {items.length} Adet
-                </div>
-            </div>
-
-            <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-                <table className="w-full text-sm text-left">
-                    <thead className="text-xs uppercase bg-black/20 text-slate-400">
-                        <tr>
-                            <th className="px-4 py-3">ID / Oyuncu</th>
-                            <th className="px-4 py-3">Miktar</th>
-                            <th className="px-4 py-3 text-right">Bot Kararı</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {items.length === 0 ? (
-                            <tr>
-                                <td colSpan="3" className="px-4 py-8 text-center text-slate-500 italic">
-                                    Çatışma bulunamadı. Sistem uyumlu çalışıyor.
-                                </td>
-                            </tr>
-                        ) : (
-                            items.map((item, idx) => (
-                                <tr key={idx} className="border-b border-white/5 hover:bg-white/5">
-                                    <td className="px-4 py-3">
-                                        <div className="font-medium text-white">{item.withdrawal.Id}</div>
-                                        <div className="text-xs text-slate-400">{item.withdrawal.ClientId}</div>
-                                    </td>
-                                    <td className="px-4 py-3 font-mono text-white">
-                                        {item.withdrawal.Amount} ₺
-                                    </td>
-                                    <td className="px-4 py-3 text-right">
-                                        <div className="font-bold">
-                                            {item.decision.decision}
-                                        </div>
-                                        <div className="text-xs opacity-60 truncate max-w-[150px]" title={item.decision.decision_reason}>
-                                            {item.decision.decision_reason}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <table className="data-table">
+            <thead>
+                <tr>
+                    <th>ID / Oyuncu</th>
+                    <th>Miktar</th>
+                    <th>Bot Kararı</th>
+                </tr>
+            </thead>
+            <tbody>
+                {items.map((item, idx) => (
+                    <tr key={idx}>
+                        <td>
+                            <div className="player-info">
+                                <span className="player-name">{item.withdrawal.Id}</span>
+                                <span className="player-id">{item.withdrawal.ClientId}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <span className="amount">{item.withdrawal.Amount} ₺</span>
+                        </td>
+                        <td>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontWeight: 600 }}>{item.decision.decision}</span>
+                                <span style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={item.decision.decision_reason}>
+                                    {item.decision.decision_reason}
+                                </span>
+                            </div>
+                        </td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
     );
 }
 
