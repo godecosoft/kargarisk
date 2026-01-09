@@ -132,20 +132,32 @@ function WithdrawalsPage({ onViewDetail }) {
     // Fetch decisions for new withdrawals using batch API
     useEffect(() => {
         const loadDecisions = async () => {
+            // Only examine 'Pending/New' withdrawals (State === 0)
             const newWithdrawals = withdrawals.filter(w => w.State === 0);
             if (newWithdrawals.length === 0) return;
 
-            // Mark all as loading
+            // Filter out withdrawals that already have a decision (to prevent re-loading/flicker)
+            // User requested: "her çekim 1 kere kontrol edilsin"
+            const withdrawalsToFetch = newWithdrawals.filter(w => !decisions[w.Id]);
+
+            if (withdrawalsToFetch.length === 0) return;
+
+            // Sort by oldest first ("en eskiden en yeniye")
+            withdrawalsToFetch.sort((a, b) => new Date(a.RequestTimeLocal) - new Date(b.RequestTimeLocal));
+
+            // Mark these specific ones as loading
             const loadingState = {};
-            newWithdrawals.forEach(w => {
+            withdrawalsToFetch.forEach(w => {
                 loadingState[w.Id] = { decision: null, loading: true };
             });
             setDecisions(prev => ({ ...prev, ...loadingState }));
 
             try {
-                const result = await fetchDecisionsBatch(newWithdrawals);
+                // Fetch in batch
+                const result = await fetchDecisionsBatch(withdrawalsToFetch);
+
                 if (result.success && result.decisions) {
-                    // Convert to state format
+                    // Update state with new decisions
                     const newDecisions = {};
                     Object.entries(result.decisions).forEach(([id, data]) => {
                         newDecisions[id] = {
@@ -158,9 +170,9 @@ function WithdrawalsPage({ onViewDetail }) {
                 }
             } catch (err) {
                 console.error('Failed to load decisions:', err);
-                // Clear loading state on error
+                // Clear loading state on error only for the accumulated ones
                 const errorState = {};
-                newWithdrawals.forEach(w => {
+                withdrawalsToFetch.forEach(w => {
                     errorState[w.Id] = { decision: null, loading: false };
                 });
                 setDecisions(prev => ({ ...prev, ...errorState }));
@@ -170,7 +182,7 @@ function WithdrawalsPage({ onViewDetail }) {
         if (withdrawals.length > 0) {
             loadDecisions();
         }
-    }, [withdrawals]);
+    }, [withdrawals]); // Only runs when withdrawals list updates
 
     // Filters
     const [statusFilter, setStatusFilter] = useState('all');
