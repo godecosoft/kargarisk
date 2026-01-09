@@ -11,9 +11,11 @@ let pool = null;
  * Initialize MySQL connection pool
  */
 async function initDatabase() {
-    // Railway provides DATABASE_URL or individual vars
-    const config = process.env.DATABASE_URL
-        ? { uri: process.env.DATABASE_URL }
+    // Railway provides DATABASE_URL, MYSQL_URL, or individual vars
+    const connectionUrl = process.env.DATABASE_URL || process.env.MYSQL_URL;
+
+    const config = connectionUrl
+        ? { uri: connectionUrl }
         : {
             host: process.env.MYSQL_HOST || process.env.MYSQLHOST || 'localhost',
             port: parseInt(process.env.MYSQL_PORT || process.env.MYSQLPORT || '3306'),
@@ -26,8 +28,8 @@ async function initDatabase() {
         };
 
     try {
-        if (process.env.DATABASE_URL) {
-            pool = mysql.createPool(process.env.DATABASE_URL);
+        if (connectionUrl) {
+            pool = mysql.createPool(connectionUrl);
         } else {
             pool = mysql.createPool(config);
         }
