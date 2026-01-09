@@ -77,8 +77,9 @@ async function getDecisionsBatch(withdrawals) {
             return results;
         }
 
-        // Get all existing decisions
-        const withdrawalIds = withdrawals.filter(w => w.State === 0).map(w => w.Id);
+        // Get all requested IDs to check against DB (regardless of state)
+        // This ensures we return historical decisions for Paid/Rejected items
+        const withdrawalIds = withdrawals.map(w => w.Id);
 
         if (withdrawalIds.length === 0) {
             return results;
@@ -93,32 +94,34 @@ async function getDecisionsBatch(withdrawals) {
 
         // Process each withdrawal
         for (const w of withdrawals) {
-            if (w.State !== 0) continue; // Skip non-new
-
             const existing = existingMap.get(w.Id);
 
             if (existing) {
-                // Check if deposit changed
-                const currentDeposit = await turnoverService.getLastDeposit(w.ClientId);
-                const depositChanged = currentDeposit &&
-                    existing.deposit_time &&
-                    new Date(currentDeposit.time).getTime() !== new Date(existing.deposit_time).getTime();
+                // If decision exists in DB, ALWAYS return it (persistence)
+                // We do NOT check for deposit changes or recalculate for non-New items
+                // This preserves the "snapshot" of the decision at the time it was made
 
-                if (!depositChanged) {
-                    results[w.Id] = {
-                        decision: existing.decision,
-                        reason: existing.decision_reason,
-                        fromCache: true,
-                        checkedAt: existing.checked_at
-                    };
-                    continue;
-                }
+                // Optional: For 'New' items only, we might want to check if data is stale,
+                // but user emphasized "bir kere yazıldıktan sonra...". 
+                // So we favor the DB record.
+
+                results[w.Id] = {
+                    decision: existing.decision,
+                    reason: existing.decision_reason,
+                    fromCache: true,
+                    checkedAt: existing.checked_at
+                };
+                continue;
             }
 
-            // Calculate and save new decision
-            // Pass full withdrawal object for audit logging
-            const decision = await calculateAndSaveDecision(w.Id, w.ClientId, w.Amount, w);
-            results[w.Id] = decision;
+            // If NOT in DB, only calculate if State is 'New' (0)
+            // We do not waste API calls on finished items
+            if (w.State === 0) {
+                // Calculate and save new decision
+                // Pass full withdrawal object for audit logging
+                const decision = await calculateAndSaveDecision(w.Id, w.ClientId, w.Amount, w);
+                results[w.Id] = decision;
+            }
         }
 
         return results;
