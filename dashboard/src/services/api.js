@@ -3,7 +3,8 @@
  * Backend ile iletişim
  */
 
-const API_BASE = 'http://localhost:3001/api';
+// Use relative URL in production, localhost in development
+const API_BASE = import.meta.env.DEV ? 'http://localhost:3001/api' : '/api';
 
 export async function fetchWithdrawals(filters = {}) {
     const response = await fetch(`${API_BASE}/withdrawals`, {

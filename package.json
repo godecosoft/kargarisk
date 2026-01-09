@@ -4,9 +4,10 @@
   "description": "BetConstruct Super App - Otomatik çekim kontrolü ve API entegrasyonları",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "server": "node src/server.js",
-    "dev": "node --watch src/index.js"
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "build": "cd dashboard && npm install && npm run build",
+    "postinstall": "cd dashboard && npm install && npm run build"
   },
   "keywords": [
     "betconstruct",

@@ -5,6 +5,7 @@
 
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const bcClient = require('./services/bcClient');
 const tokenService = require('./services/tokenService');
 const logger = require('./utils/logger');
@@ -17,6 +18,9 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Serve static frontend files (production)
+app.use(express.static(path.join(__dirname, '../dashboard/dist')));
 
 // Request logging
 app.use((req, res, next) => {
@@ -225,6 +229,15 @@ app.get('/api/decisions/:withdrawalId', async (req, res) => {
         logger.error('Decision get error', { error: error.message });
         res.status(500).json({ success: false, error: error.message });
     }
+});
+
+// SPA fallback - serve index.html for non-API routes
+app.get('*', (req, res) => {
+    // Don't serve index.html for API routes
+    if (req.path.startsWith('/api')) {
+        return res.status(404).json({ error: 'Not found' });
+    }
+    res.sendFile(path.join(__dirname, '../dashboard/dist/index.html'));
 });
 
 // Error handler
