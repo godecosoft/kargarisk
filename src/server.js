@@ -232,12 +232,16 @@ app.get('/api/decisions/:withdrawalId', async (req, res) => {
 });
 
 // SPA fallback - serve index.html for non-API routes
-app.get('*', (req, res) => {
-    // Don't serve index.html for API routes
+app.use((req, res, next) => {
+    // Skip API routes
     if (req.path.startsWith('/api')) {
         return res.status(404).json({ error: 'Not found' });
     }
-    res.sendFile(path.join(__dirname, '../dashboard/dist/index.html'));
+    // Serve index.html for all other GET requests
+    if (req.method === 'GET') {
+        return res.sendFile(path.join(__dirname, '../dashboard/dist/index.html'));
+    }
+    next();
 });
 
 // Error handler
