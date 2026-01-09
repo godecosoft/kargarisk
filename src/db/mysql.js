@@ -60,8 +60,8 @@ async function runMigrations() {
     const createDecisionsTable = `
         CREATE TABLE IF NOT EXISTS decisions (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            withdrawal_id INT NOT NULL,
-            client_id INT NOT NULL,
+            withdrawal_id BIGINT NOT NULL,
+            client_id BIGINT NOT NULL,
             decision ENUM('ONAY', 'RET', 'MANUEL') NOT NULL,
             decision_reason VARCHAR(500),
             deposit_amount DECIMAL(12,2),
@@ -99,6 +99,17 @@ async function runMigrations() {
         } catch (e) {
             // Ignore if column exists
             if (e.errno !== 1060) console.error('[DB] Migration column warning:', e.message);
+        }
+
+        // Upgrade withdrawal_id and client_id from INT to BIGINT (for existing tables)
+        // BC uses very large IDs that can overflow INT
+        try {
+            await pool.query('ALTER TABLE decisions MODIFY COLUMN withdrawal_id BIGINT NOT NULL');
+            await pool.query('ALTER TABLE decisions MODIFY COLUMN client_id BIGINT NOT NULL');
+            console.log('[DB] Upgraded withdrawal_id and client_id to BIGINT');
+        } catch (e) {
+            // Ignore if already BIGINT or other non-critical issues
+            if (e.errno !== 1060) console.log('[DB] Column type check:', e.message);
         }
 
         // Rules table
