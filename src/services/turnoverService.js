@@ -163,11 +163,16 @@ function calculateTurnover(transactions, afterTime, requiredAmount, multiplier =
 }
 
 const rulesService = require('./rulesService');
+const txAnalysis = require('./transactionAnalysisService');
 
 /**
  * Tam çevrim raporu al
+ * @param {number} clientId - Client ID
+ * @param {number} multiplier - Çevrim katı
+ * @param {number} withdrawalAmount - Çekim tutarı (withdrawal type detection için)
+ * @param {number} currentBalance - Mevcut bakiye (cashback kontrolü için)
  */
-async function getTurnoverReport(clientId, multiplier = null) {
+async function getTurnoverReport(clientId, multiplier = null, withdrawalAmount = null, currentBalance = null) {
     try {
         // Get multiplier from rules if not provided
         if (multiplier === null) {
@@ -184,29 +189,78 @@ async function getTurnoverReport(clientId, multiplier = null) {
                 success: false,
                 error: 'İşlem bulunamadı',
                 deposit: null,
-                turnover: null
+                turnover: null,
+                withdrawalType: null
             };
         }
 
-        // Son yatırımı bul
-        const lastDeposit = findLastDeposit(transactions);
+        // Analyze withdrawal type (Cashback/FreeSpin/Bonus/Deposit)
+        const withdrawalType = txAnalysis.analyzeWithdrawalType(
+            transactions,
+            withdrawalAmount || 0,
+            currentBalance || 0
+        );
 
-        if (!lastDeposit) {
-            logger.warn('No deposit found', { clientId });
+        logger.info('Withdrawal type analysis', { clientId, type: withdrawalType.type });
+
+        // Handle Cashback withdrawals - no turnover required
+        if (withdrawalType.type === 'CASHBACK') {
             return {
-                success: false,
-                error: 'Yatırım bulunamadı',
+                success: true,
+                withdrawalType,
                 deposit: null,
-                turnover: null
+                turnover: {
+                    isComplete: true,
+                    required: 0,
+                    total: { amount: 0, percentage: 100 }
+                },
+                decision: withdrawalType.decision || 'MANUEL',
+                decisionReason: withdrawalType.reason || 'Cashback çekimi',
+                multiplier,
+                skipTurnover: true
+            };
+        }
+
+        // For FreeSpin/Bonus/Deposit - find reference point
+        let referenceTime;
+        let requiredAmount;
+
+        if (withdrawalType.type === 'FREESPIN' || withdrawalType.type === 'BONUS') {
+            // Use freespin/bonus time as reference
+            referenceTime = new Date(withdrawalType.time);
+            requiredAmount = withdrawalType.amount;
+            logger.info('Using FreeSpin/Bonus as reference', { type: withdrawalType.type, time: withdrawalType.time });
+        } else {
+            // Standard deposit-based turnover
+            const lastDeposit = findLastDeposit(transactions);
+
+            if (!lastDeposit) {
+                logger.warn('No deposit found', { clientId });
+                return {
+                    success: false,
+                    error: 'Yatırım bulunamadı',
+                    deposit: null,
+                    turnover: null,
+                    withdrawalType
+                };
+            }
+
+            referenceTime = new Date(lastDeposit.CreatedLocal);
+            requiredAmount = lastDeposit.Amount;
+
+            // Store deposit info for response
+            withdrawalType.deposit = {
+                amount: lastDeposit.Amount,
+                time: lastDeposit.CreatedLocal,
+                paymentSystem: lastDeposit.PaymentSystemName
             };
         }
 
         // Çevrimi hesapla
-        const depositTime = new Date(lastDeposit.CreatedLocal);
         const turnover = calculateTurnover(
             transactions,
-            depositTime,
-            lastDeposit.Amount,
+            referenceTime,
+            requiredAmount,
             multiplier
         );
 
@@ -222,12 +276,20 @@ async function getTurnoverReport(clientId, multiplier = null) {
             decisionReason = `Çevrim eksik (%${turnover.total.percentage})`;
         }
 
+        // Add withdrawal type context to reason
+        if (withdrawalType.type === 'FREESPIN') {
+            decisionReason = `[FreeSpin Çekimi] ${decisionReason}`;
+        } else if (withdrawalType.type === 'BONUS') {
+            decisionReason = `[Bonus Çekimi] ${decisionReason}`;
+        }
+
         return {
             success: true,
-            deposit: {
-                amount: lastDeposit.Amount,
-                time: lastDeposit.CreatedLocal,
-                paymentSystem: lastDeposit.PaymentSystemName
+            withdrawalType,
+            deposit: withdrawalType.deposit || {
+                amount: requiredAmount,
+                time: referenceTime.toISOString(),
+                paymentSystem: null
             },
             turnover,
             decision,
@@ -241,7 +303,8 @@ async function getTurnoverReport(clientId, multiplier = null) {
             success: false,
             error: error.message,
             deposit: null,
-            turnover: null
+            turnover: null,
+            withdrawalType: null
         };
     }
 }
