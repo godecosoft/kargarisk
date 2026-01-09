@@ -106,3 +106,16 @@ export async function saveRule(key, value, description) {
     if (!response.ok) throw new Error('Failed to save rule');
     return response.json();
 }
+
+export async function fetchIPAnalysis(clientId, days = 7) {
+    const response = await fetch(`${API_BASE}/client/${clientId}/ip-analysis?days=${days}`);
+    if (!response.ok) throw new Error('Failed to fetch IP analysis');
+    return response.json();
+}
+
+export async function fetchBonusTransactions(clientId) {
+    const response = await fetch(`${API_BASE}/client/${clientId}/bonus-transactions`);
+    if (!response.ok) throw new Error('Failed to fetch bonus transactions');
+    return response.json();
+}
+

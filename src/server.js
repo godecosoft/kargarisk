@@ -191,6 +191,74 @@ app.get('/api/client/:clientId/sports', async (req, res) => {
 });
 
 /**
+ * GET /api/client/:clientId/ip-analysis
+ * IP bazlı çoklu hesap kontrolü
+ */
+app.get('/api/client/:clientId/ip-analysis', async (req, res) => {
+    try {
+        const ipControlService = require('./services/ipControlService');
+        const clientId = parseInt(req.params.clientId);
+        const days = parseInt(req.query.days) || 7;
+
+        const analysis = await ipControlService.getIPAnalysis(clientId, days);
+        res.json(analysis);
+    } catch (error) {
+        logger.error('IP Analysis API Error', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * GET /api/client/:clientId/bonus-transactions
+ * Son yatırımdan sonraki FreeSpin ve Bonus işlemleri
+ */
+app.get('/api/client/:clientId/bonus-transactions', async (req, res) => {
+    try {
+        const turnoverService = require('./services/turnoverService');
+        const clientId = parseInt(req.params.clientId);
+
+        // Get transactions (2 months)
+        const transactions = await turnoverService.getClientTransactions(clientId, 2);
+
+        // Find last deposit
+        const deposit = turnoverService.findLastDeposit(transactions);
+        const depositTime = deposit ? new Date(deposit.CreatedLocal) : new Date(0);
+
+        // Filter FreeSpin (DocType=15, Game contains FreeSpin) and Pay Client Bonus (DocType=83)
+        const bonusTransactions = transactions.filter(tx => {
+            const txTime = new Date(tx.CreatedLocal);
+            if (txTime <= depositTime) return false;
+
+            // FreeSpin
+            if (tx.DocumentTypeId === 15 && tx.Game?.toLowerCase().includes('freespin')) {
+                return true;
+            }
+            // Pay Client Bonus
+            if (tx.DocumentTypeId === 83) {
+                return true;
+            }
+            return false;
+        }).map(tx => ({
+            type: tx.DocumentTypeId === 83 ? 'BONUS' : 'FREESPIN',
+            game: tx.Game,
+            amount: tx.Amount,
+            balance: tx.Balance,
+            time: tx.CreatedLocal,
+            balanceBefore: tx.Balance - tx.Amount
+        }));
+
+        res.json({
+            success: true,
+            depositTime: deposit?.CreatedLocal,
+            data: bonusTransactions
+        });
+    } catch (error) {
+        logger.error('Bonus Transactions API Error', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
  * POST /api/decisions/batch
  * Get decisions for multiple withdrawals (batch)
  */

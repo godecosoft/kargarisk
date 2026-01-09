@@ -104,9 +104,53 @@ class BCClient {
 
         return response.Data;
     }
-}
 
-// Singleton instance
+    /**
+     * Get client login history (for IP analysis)
+     * @param {number} clientId - Client ID
+     * @param {number} days - Number of days to look back (default 7)
+     */
+    async getClientLogins(clientId, days = 7) {
+        const toDate = new Date();
+        const fromDate = new Date();
+        fromDate.setDate(fromDate.getDate() - days);
+
+        const formatDate = (date) => {
+            const dd = String(date.getDate()).padStart(2, '0');
+            const mm = String(date.getMonth() + 1).padStart(2, '0');
+            const yy = String(date.getFullYear()).slice(-2);
+            return `${dd}-${mm}-${yy} - 00:00:00`;
+        };
+
+        const payload = {
+            ClientId: clientId,
+            FromDateLocal: formatDate(fromDate),
+            ToDateLocal: formatDate(toDate)
+        };
+
+        logger.info('Fetching client logins', { clientId, days });
+
+        const response = await this.post('/Client/GetLogins', payload);
+        return response.Data?.Objects || [];
+    }
+
+    /**
+     * Get clients who logged in from a specific IP
+     * @param {string} ip - IP address to check
+     */
+    async getClientsByIP(ip) {
+        const payload = {
+            LoginIP: ip,
+            SkeepRows: 0,
+            MaxRows: 10
+        };
+
+        logger.debug('Checking IP for multi-account', { ip });
+
+        const response = await this.post('/Client/GetClientsByIPAddress', payload);
+        return response.Data?.Objects || [];
+    }
+}
 const bcClient = new BCClient();
 
 module.exports = bcClient;

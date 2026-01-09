@@ -14,9 +14,12 @@ import {
     User,
     Calendar,
     AlertTriangle,
-    ArrowLeft
+    ArrowLeft,
+    Wifi,
+    Users,
+    Sparkles
 } from 'lucide-react';
-import { fetchNewWithdrawals, fetchClientTurnover, fetchClientBonuses, fetchClientSports } from '../services/api';
+import { fetchNewWithdrawals, fetchClientTurnover, fetchClientBonuses, fetchClientSports, fetchIPAnalysis, fetchBonusTransactions } from '../services/api';
 
 // Store for sharing current checking ID across components
 export const autoControlStore = {
@@ -218,6 +221,8 @@ function AutoControlPage({ singleWithdrawal, onBack }) {
     const [checkingData, setCheckingData] = useState(null);
     const [bonuses, setBonuses] = useState([]);
     const [sportsData, setSportsData] = useState(null);
+    const [ipAnalysis, setIpAnalysis] = useState(null);
+    const [bonusTransactions, setBonusTransactions] = useState([]);
     const [showCasinoGames, setShowCasinoGames] = useState(false);
     const [showCoupons, setShowCoupons] = useState(false);
     const [error, setError] = useState(null);
@@ -253,10 +258,12 @@ function AutoControlPage({ singleWithdrawal, onBack }) {
 
         try {
             // Fetch turnover, bonuses, sports in parallel
-            const [turnoverRes, bonusesRes, sportsRes] = await Promise.all([
+            const [turnoverRes, bonusesRes, sportsRes, ipRes, bonusTxRes] = await Promise.all([
                 fetchClientTurnover(clientId),
                 fetchClientBonuses(clientId, 5),
-                fetchClientSports(clientId)
+                fetchClientSports(clientId),
+                fetchIPAnalysis(clientId, 7),
+                fetchBonusTransactions(clientId)
             ]);
 
             // Update decision based on sports pre-deposit winning
@@ -268,6 +275,8 @@ function AutoControlPage({ singleWithdrawal, onBack }) {
             setCheckingData(turnoverRes);
             setBonuses(bonusesRes.success ? bonusesRes.data : []);
             setSportsData(sportsRes);
+            setIpAnalysis(ipRes.success ? ipRes : null);
+            setBonusTransactions(bonusTxRes.success ? bonusTxRes.data : []);
 
         } catch (err) {
             console.error('Failed to load details:', err);
@@ -523,6 +532,144 @@ function AutoControlPage({ singleWithdrawal, onBack }) {
                             )}
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            {/* FreeSpin & Bonus Transactions Card */}
+            <div className="card" style={{ marginTop: 16 }}>
+                <div className="card-header">
+                    <span className="card-title">
+                        <Sparkles size={18} style={{ marginRight: 8 }} />
+                        Yatırım Sonrası FreeSpin & Bonus
+                    </span>
+                    <span className="status-badge info" style={{ background: 'var(--status-processing-bg)', color: 'var(--status-processing)' }}>
+                        {bonusTransactions.length} İşlem
+                    </span>
+                </div>
+                <div className="data-table-wrapper">
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th>Tür</th>
+                                <th>Oyun/Kaynak</th>
+                                <th>Tutar</th>
+                                <th>Önceki Bakiye</th>
+                                <th>Sonraki Bakiye</th>
+                                <th>Tarih</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {bonusTransactions.length === 0 ? (
+                                <tr>
+                                    <td colSpan="6" style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}>
+                                        Yatırım sonrası FreeSpin veya Bonus işlemi bulunamadı
+                                    </td>
+                                </tr>
+                            ) : (
+                                bonusTransactions.map((tx, idx) => (
+                                    <tr key={idx}>
+                                        <td>
+                                            <span className={`status-badge ${tx.type === 'FREESPIN' ? 'processing' : 'approved'}`}>
+                                                {tx.type === 'FREESPIN' ? '🎰 FreeSpin' : '🎁 Bonus'}
+                                            </span>
+                                        </td>
+                                        <td>{tx.game || 'Pay Client Bonus'}</td>
+                                        <td style={{ color: 'var(--status-approved)', fontWeight: 600 }}>+{formatCurrency(tx.amount)}</td>
+                                        <td>{formatCurrency(tx.balanceBefore)}</td>
+                                        <td>{formatCurrency(tx.balance)}</td>
+                                        <td>{formatDateTime(tx.time)}</td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* IP Control Card */}
+            <div className="card" style={{ marginTop: 16 }}>
+                <div className="card-header">
+                    <span className="card-title">
+                        <Wifi size={18} style={{ marginRight: 8 }} />
+                        IP Kontrolü (Son 7 Gün)
+                    </span>
+                    {ipAnalysis?.hasMultiAccount && (
+                        <span className="status-badge rejected">
+                            <AlertTriangle size={14} /> Çoklu Hesap Tespit Edildi!
+                        </span>
+                    )}
+                </div>
+                <div className="card-body">
+                    {!ipAnalysis ? (
+                        <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}>
+                            IP analizi yükleniyor...
+                        </div>
+                    ) : ipAnalysis.analysis?.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}>
+                            Login kaydı bulunamadı
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            <div style={{ display: 'flex', gap: 16, marginBottom: 8 }}>
+                                <div style={{ padding: '8px 16px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
+                                    <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Toplam Giriş</span>
+                                    <div style={{ fontSize: 18, fontWeight: 600 }}>{ipAnalysis.totalLogins}</div>
+                                </div>
+                                <div style={{ padding: '8px 16px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
+                                    <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Farklı IP</span>
+                                    <div style={{ fontSize: 18, fontWeight: 600 }}>{ipAnalysis.uniqueIPs}</div>
+                                </div>
+                                {ipAnalysis.hasMultiAccount && (
+                                    <div style={{ padding: '8px 16px', background: 'var(--status-rejected-bg)', borderRadius: 'var(--radius-md)' }}>
+                                        <span style={{ color: 'var(--status-rejected)', fontSize: 12 }}>Diğer Hesaplar</span>
+                                        <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--status-rejected)' }}>{ipAnalysis.totalOtherAccounts}</div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {ipAnalysis.analysis.map((ipData, idx) => (
+                                <div key={idx} style={{
+                                    padding: 12,
+                                    background: ipData.otherAccounts.length > 0 ? 'var(--status-rejected-bg)' : 'var(--bg-tertiary)',
+                                    borderRadius: 'var(--radius-md)',
+                                    border: ipData.otherAccounts.length > 0 ? '1px solid var(--status-rejected)' : 'none'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                        <div style={{ fontFamily: 'monospace', fontSize: 14, fontWeight: 600 }}>
+                                            {ipData.ip}
+                                        </div>
+                                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                                            {ipData.loginCount} giriş • {ipData.source}
+                                        </div>
+                                    </div>
+
+                                    {ipData.otherAccounts.length > 0 && (
+                                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border-subtle)' }}>
+                                            <div style={{ fontSize: 12, color: 'var(--status-rejected)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                <Users size={14} /> Bu IP'yi kullanan diğer hesaplar:
+                                            </div>
+                                            {ipData.otherAccounts.map((acc, accIdx) => (
+                                                <div key={accIdx} style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    padding: '6px 10px',
+                                                    background: 'var(--bg-card)',
+                                                    borderRadius: 'var(--radius-sm)',
+                                                    marginTop: 4,
+                                                    fontSize: 13
+                                                }}>
+                                                    <span style={{ fontWeight: 500 }}>{acc.login}</span>
+                                                    <span style={{ color: 'var(--text-muted)' }}>
+                                                        ID: {acc.clientId} • {acc.loginCount} giriş • Kayıt: {formatDateTime(acc.registrationDate)}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
 
