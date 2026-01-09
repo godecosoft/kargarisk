@@ -231,6 +231,23 @@ app.get('/api/decisions/:withdrawalId', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/reports/stats
+ * Get comprehensive reports and conflict analysis
+ */
+app.get('/api/reports/stats', async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        const reportsService = require('./services/reportsService');
+
+        const stats = await reportsService.getStats(startDate, endDate);
+        res.json({ success: true, stats });
+    } catch (error) {
+        logger.error('Reports Stats Error', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // SPA fallback - serve index.html for non-API routes
 app.use((req, res, next) => {
     // Skip API routes

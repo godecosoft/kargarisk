@@ -3,6 +3,8 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import WithdrawalsPage from './pages/WithdrawalsPage';
 import AutoControlPage from './pages/AutoControlPage';
+import ReportsPage from './pages/ReportsPage';
+import RuleEnginePage from './pages/RuleEnginePage';
 import './index.css';
 
 function App() {
@@ -30,6 +32,10 @@ function App() {
           singleWithdrawal={selectedWithdrawal}
           onBack={handleBackToList}
         />;
+      case 'reports':
+        return <ReportsPage />;
+      case 'rules':
+        return <RuleEnginePage />;
       default:
         return <WithdrawalsPage onViewDetail={handleViewDetail} />;
     }

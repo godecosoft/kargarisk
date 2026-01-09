@@ -79,3 +79,14 @@ export async function fetchDecisionsBatch(withdrawals) {
 
     return response.json();
 }
+
+export async function fetchReportsStats(startDate, endDate) {
+    const params = new URLSearchParams({ startDate, endDate });
+    const response = await fetch(`${API_BASE}/reports/stats?${params}`);
+
+    if (!response.ok) {
+        throw new Error('Failed to fetch reports');
+    }
+
+    return response.json();
+}
