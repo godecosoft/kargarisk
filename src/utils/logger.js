@@ -13,7 +13,12 @@ const LOG_LEVELS = {
 const currentLevel = LOG_LEVELS[process.env.LOG_LEVEL] || LOG_LEVELS.INFO;
 
 function formatTimestamp() {
-    return new Date().toISOString().replace('T', ' ').substring(0, 19);
+    // Return local time (respects TZ env variable) in format: YYYY-MM-DD HH:mm:ss
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ` +
+        `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 }
 
 function formatMessage(level, message, data) {
