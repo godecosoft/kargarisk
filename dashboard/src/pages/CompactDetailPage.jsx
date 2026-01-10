@@ -258,10 +258,26 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                                 ) : (
                                     <div className="mini-list">
                                         {sportsBets.slice(0, 4).map((bet, i) => (
-                                            <div key={i} className="mini-item">
-                                                <span className="item-name">
-                                                    {bet.selections?.[0]?.matchName || bet.type || `Bahis #${bet.id}`}
-                                                </span>
+                                            <div key={i} className="mini-item sports-item">
+                                                <div className="item-info">
+                                                    {bet.selections && bet.selections.length > 0 ? (
+                                                        <>
+                                                            {bet.selections.length > 1 && (
+                                                                <div className="bet-type-label">Kombine ({bet.selections.length})</div>
+                                                            )}
+                                                            {bet.selections.map((s, idx) => (
+                                                                <div key={idx} className="match-row">
+                                                                    <span className="match-name">{s.matchName}</span>
+                                                                    <span className="selection-outcome"> {s.selectionName}</span>
+                                                                </div>
+                                                            ))}
+                                                        </>
+                                                    ) : (
+                                                        <span className="match-name">
+                                                            {bet.type || `Bahis #${bet.id}`}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <span className={`item-amount ${(bet.winningAmount || 0) > 0 ? 'positive' : ''}`}>
                                                     {formatCurrency(bet.amount)} → {formatCurrency(bet.winningAmount || 0)}
                                                 </span>
@@ -575,11 +591,20 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                 .mini-item {
                     display: flex;
                     justify-content: space-between;
-                    padding: 6px 8px;
+                    padding: 8px 10px;
                     background: var(--bg-tertiary);
                     border-radius: var(--radius-sm);
                     font-size: 12px;
                 }
+                .mini-item.sports-item { flex-direction: column; align-items: flex-start; gap: 6px; }
+                .sports-item .item-info { width: 100%; display: flex; flex-direction: column; gap: 4px; }
+                .match-row { display: flex; justify-content: space-between; align-items: flex-start; font-size: 11px; padding: 2px 0; border-bottom: 1px dashed var(--border-subtle); }
+                .match-row:last-child { border-bottom: none; }
+                .match-name { color: var(--text-secondary); flex: 1; }
+                .selection-outcome { font-weight: 600; color: var(--text-primary); margin-left: 8px; white-space: nowrap; }
+                .bet-type-label { font-size: 10px; font-weight: 700; color: var(--status-pending); text-transform: uppercase; margin-bottom: 2px; }
+                .sports-item .item-amount { align-self: flex-end; font-size: 12px; margin-top: 4px; font-weight: 700; }
+                
                 .item-name { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
                 .item-amount { font-weight: 600; color: var(--text-primary); }
                 .item-amount.positive { color: var(--status-approved); }
