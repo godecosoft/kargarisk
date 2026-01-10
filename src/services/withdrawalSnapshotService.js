@@ -248,7 +248,20 @@ async function getDecisionsBatch(withdrawals) {
                     fromCache: false
                 };
             } else {
-                logger.warn(`[SnapshotService] Failed to create snapshot for ${w.Id}: ${snapshot.error}`);
+                // Failed to create snapshot - save MANUEL decision with error message
+                const errorReason = `Kontrol başarısız: ${snapshot.error || 'Bilinmeyen hata'}`;
+                logger.warn(`[SnapshotService] Saving MANUEL for ${w.Id}: ${errorReason}`);
+
+                // Save to DB so it doesn't stay loading forever
+                await saveFailedSnapshot(w, errorReason);
+
+                results[w.Id] = {
+                    decision: 'MANUEL',
+                    reason: errorReason,
+                    withdrawalType: 'UNKNOWN',
+                    fromCache: false,
+                    failed: true
+                };
             }
 
             // Small delay between API calls to avoid rate limiting
@@ -309,6 +322,43 @@ async function createSnapshotWithRetry(withdrawal, maxRetries = 3) {
     }
 
     return { success: false, error: 'Max retries reached' };
+}
+
+/**
+ * Save a failed snapshot as MANUEL decision
+ * This ensures the item doesn't stay in loading state forever
+ */
+async function saveFailedSnapshot(withdrawal, errorReason) {
+    const pool = db.getPool();
+    if (!pool) return;
+
+    try {
+        await pool.query(`
+            INSERT INTO withdrawals (
+                id, client_id, client_login, amount, status, payment_method, request_time,
+                bot_decision, decision_reason, withdrawal_type,
+                withdrawal_data, checked_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'MANUEL', ?, 'UNKNOWN', ?, NOW())
+            ON DUPLICATE KEY UPDATE
+                bot_decision = 'MANUEL',
+                decision_reason = VALUES(decision_reason),
+                updated_at = NOW()
+        `, [
+            withdrawal.Id,
+            withdrawal.ClientId,
+            withdrawal.ClientLogin || null,
+            withdrawal.Amount,
+            withdrawal.State,
+            withdrawal.PaymentSystemName || null,
+            withdrawal.RequestTimeLocal ? new Date(withdrawal.RequestTimeLocal) : null,
+            errorReason,
+            JSON.stringify(withdrawal)
+        ]);
+
+        logger.info(`[SnapshotService] Saved failed snapshot for ${withdrawal.Id}`);
+    } catch (error) {
+        logger.error(`[SnapshotService] saveFailedSnapshot error: ${error.message}`);
+    }
 }
 
 /**
