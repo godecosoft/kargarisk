@@ -254,10 +254,27 @@ function AutoControlPage({ singleWithdrawal, onBack }) {
         }
 
         const clientId = currentWithdrawal.ClientId;
-        autoControlStore.setCurrentId(currentWithdrawal.Id);
+        const withdrawalId = currentWithdrawal.Id;
+        autoControlStore.setCurrentId(withdrawalId);
 
         try {
-            // Fetch turnover, bonuses, sports in parallel
+            // First, try to get snapshot from DB (fast, no BC API calls)
+            const { fetchWithdrawalSnapshot } = await import('../services/api');
+            const snapshot = await fetchWithdrawalSnapshot(withdrawalId);
+
+            if (snapshot.success && snapshot.fromDB) {
+                // Use DB data - this is the snapshot from when bot first analyzed
+                console.log('[AutoControl] Loaded from DB snapshot');
+                setCheckingData(snapshot.turnover || { success: false });
+                setBonuses(snapshot.bonuses || []);
+                setSportsData(snapshot.sports || null);
+                setIpAnalysis(snapshot.ipAnalysis || null);
+                setBonusTransactions(snapshot.bonusTransactions?.data || []);
+                return;
+            }
+
+            // Fallback: Fetch fresh from BC APIs (for items not yet in DB)
+            console.log('[AutoControl] Fetching fresh from BC APIs');
             const [turnoverRes, bonusesRes, sportsRes, ipRes, bonusTxRes] = await Promise.all([
                 fetchClientTurnover(clientId),
                 fetchClientBonuses(clientId, 5),

@@ -11,6 +11,7 @@ const tokenService = require('./services/tokenService');
 const logger = require('./utils/logger');
 const db = require('./db/mysql');
 const decisionService = require('./services/decisionService');
+const snapshotService = require('./services/withdrawalSnapshotService');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -261,6 +262,7 @@ app.get('/api/client/:clientId/bonus-transactions', async (req, res) => {
 /**
  * POST /api/decisions/batch
  * Get decisions for multiple withdrawals (batch)
+ * Uses snapshot service - creates full snapshot on first analysis
  */
 app.post('/api/decisions/batch', async (req, res) => {
     try {
@@ -270,10 +272,36 @@ app.post('/api/decisions/batch', async (req, res) => {
             return res.status(400).json({ success: false, error: 'withdrawals array required' });
         }
 
-        const decisions = await decisionService.getDecisionsBatch(withdrawals);
+        // Use snapshot service - returns from DB if exists, creates snapshot if new
+        const decisions = await snapshotService.getDecisionsBatch(withdrawals);
+
+        // Also sync statuses for items that exist in DB
+        await snapshotService.syncStatuses(withdrawals);
+
         res.json({ success: true, decisions });
     } catch (error) {
         logger.error('Decisions batch error', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * GET /api/withdrawal/:id/snapshot
+ * Get full snapshot from DB (for detail page)
+ * Returns ALL data: turnover, sports, bonuses, IP analysis
+ */
+app.get('/api/withdrawal/:withdrawalId/snapshot', async (req, res) => {
+    try {
+        const withdrawalId = parseInt(req.params.withdrawalId);
+        const snapshot = await snapshotService.getSnapshot(withdrawalId);
+
+        if (!snapshot) {
+            return res.json({ success: false, error: 'Snapshot not found', fromDB: false });
+        }
+
+        res.json(snapshot);
+    } catch (error) {
+        logger.error('Snapshot error', { error: error.message });
         res.status(500).json({ success: false, error: error.message });
     }
 });

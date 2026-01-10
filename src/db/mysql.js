@@ -122,7 +122,45 @@ async function runMigrations() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
 
-        console.log('[DB] Migrations completed - decisions ve rules tabloları hazır');
+        // Withdrawals table - Full Snapshot Architecture
+        // Stores ALL detail page data at the moment of bot analysis
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS withdrawals (
+                id BIGINT PRIMARY KEY,
+                client_id BIGINT NOT NULL,
+                client_login VARCHAR(100),
+                amount DECIMAL(12,2) NOT NULL,
+                status INT NOT NULL DEFAULT 0,
+                payment_method VARCHAR(100),
+                request_time DATETIME,
+                
+                -- Bot Decision (Immutable after first save)
+                bot_decision ENUM('ONAY', 'RET', 'MANUEL'),
+                decision_reason TEXT,
+                withdrawal_type ENUM('DEPOSIT', 'CASHBACK', 'FREESPIN', 'BONUS', 'UNKNOWN') DEFAULT 'UNKNOWN',
+                
+                -- Full Snapshot Data (Immutable - JSON columns)
+                withdrawal_data JSON,
+                client_data JSON,
+                turnover_data JSON,
+                sports_data JSON,
+                bonuses_data JSON,
+                bonus_transactions JSON,
+                ip_analysis JSON,
+                
+                -- Timestamps
+                checked_at DATETIME,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                
+                INDEX idx_client (client_id),
+                INDEX idx_status (status),
+                INDEX idx_created (created_at),
+                INDEX idx_checked (checked_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
+
+        console.log('[DB] Migrations completed - decisions, rules ve withdrawals tabloları hazır');
     } catch (error) {
         console.error('[DB] Migration hatası:', error.message);
     }

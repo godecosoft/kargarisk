@@ -119,3 +119,10 @@ export async function fetchBonusTransactions(clientId) {
     return response.json();
 }
 
+export async function fetchWithdrawalSnapshot(withdrawalId) {
+    const response = await fetch(`${API_BASE}/withdrawal/${withdrawalId}/snapshot`);
+    if (!response.ok) throw new Error('Failed to fetch snapshot');
+    return response.json();
+}
+
+
