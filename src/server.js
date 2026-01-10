@@ -409,25 +409,6 @@ app.post('/api/rules', async (req, res) => {
     }
 });
 
-// SPA fallback - serve index.html for non-API routes
-app.use((req, res, next) => {
-    // Skip API routes
-    if (req.path.startsWith('/api')) {
-        return res.status(404).json({ error: 'Not found' });
-    }
-    // Serve index.html for all other GET requests
-    if (req.method === 'GET') {
-        return res.sendFile(path.join(__dirname, '../dashboard/dist/index.html'));
-    }
-    next();
-});
-
-// Error handler
-app.use((err, req, res, next) => {
-    logger.error('Unhandled Error', { error: err.message, stack: err.stack });
-    res.status(500).json({ error: 'Internal Server Error' });
-});
-
 // ============================================
 // AUTO-APPROVAL ENDPOINTS
 // ============================================
@@ -511,6 +492,25 @@ app.get('/api/auto-approval/history', async (req, res) => {
         logger.error('Get auto-approval history error', { error: error.message });
         res.status(500).json({ success: false, error: error.message });
     }
+});
+
+// SPA fallback - serve index.html for non-API routes
+app.use((req, res, next) => {
+    // Skip API routes
+    if (req.path.startsWith('/api')) {
+        return res.status(404).json({ error: 'Not found' });
+    }
+    // Serve index.html for all other GET requests
+    if (req.method === 'GET') {
+        return res.sendFile(path.join(__dirname, '../dashboard/dist/index.html'));
+    }
+    next();
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+    logger.error('Unhandled Error', { error: err.message, stack: err.stack });
+    res.status(500).json({ error: 'Internal Server Error' });
 });
 
 // Server başlat
