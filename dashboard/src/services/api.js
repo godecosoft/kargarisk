@@ -125,4 +125,8 @@ export async function fetchWithdrawalSnapshot(withdrawalId) {
     return response.json();
 }
 
-
+export async function fetchClientKpi(clientId) {
+    const response = await fetch(`${API_BASE}/client/${clientId}/kpi`);
+    if (!response.ok) throw new Error('Failed to fetch client KPI');
+    return response.json();
+}

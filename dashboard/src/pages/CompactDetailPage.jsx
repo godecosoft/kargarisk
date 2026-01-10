@@ -75,6 +75,7 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
     const [bonuses, setBonuses] = useState([]);
     const [bonusTx, setBonusTx] = useState([]);
     const [ipAnalysis, setIpAnalysis] = useState(null);
+    const [clientKpi, setClientKpi] = useState(null);
     const [loading, setLoading] = useState(true);
 
     // Load all data
@@ -111,6 +112,11 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                     setBonusTx(bt.data || []);
                     setIpAnalysis(ip);
                 }
+
+                // Always fetch fresh KPI
+                const { fetchClientKpi } = await import('../services/api');
+                const kpiRes = await fetchClientKpi(clientId);
+                if (kpiRes.success) setClientKpi(kpiRes.data);
             } catch (e) {
                 console.error('Load error:', e);
             }
@@ -148,6 +154,34 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
             {/* Decision Reason */}
             {decisionReason && (
                 <div className="decision-reason">{decisionReason}</div>
+            )}
+
+            {/* Client KPI Stats Bar */}
+            {clientKpi && (
+                <div className="kpi-bar">
+                    <div className="kpi-stat">
+                        <span className="kpi-label">Toplam Yatırım</span>
+                        <span className="kpi-value">{formatCurrency(clientKpi.depositAmount)} <small>({clientKpi.depositCount}x)</small></span>
+                    </div>
+                    <div className="kpi-stat">
+                        <span className="kpi-label">Toplam Çekim</span>
+                        <span className="kpi-value">{formatCurrency(clientKpi.withdrawalAmount)} <small>({clientKpi.withdrawalCount}x)</small></span>
+                    </div>
+                    <div className="kpi-stat">
+                        <span className="kpi-label">Son Çekim</span>
+                        <span className="kpi-value">{formatCurrency(clientKpi.lastWithdrawalAmount)}</span>
+                    </div>
+                    <div className="kpi-stat">
+                        <span className="kpi-label">Spor Bahis</span>
+                        <span className="kpi-value">{clientKpi.totalSportBets} <small>({clientKpi.totalUnsettledBets} açık)</small></span>
+                    </div>
+                    {clientKpi.btag && (
+                        <div className="kpi-stat btag">
+                            <span className="kpi-label">BTag</span>
+                            <span className="kpi-value">{clientKpi.btag}</span>
+                        </div>
+                    )}
+                </div>
             )}
 
             {loading ? (
@@ -390,6 +424,29 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                     margin-bottom: 12px;
                     text-align: center;
                 }
+
+                .kpi-bar {
+                    display: flex;
+                    gap: 8px;
+                    padding: 10px 16px;
+                    background: var(--bg-card);
+                    border-radius: var(--radius-lg);
+                    margin-bottom: 12px;
+                    flex-wrap: wrap;
+                }
+                .kpi-stat {
+                    display: flex;
+                    flex-direction: column;
+                    padding: 6px 12px;
+                    background: var(--bg-tertiary);
+                    border-radius: var(--radius-md);
+                    min-width: 100px;
+                }
+                .kpi-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+                .kpi-value { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+                .kpi-value small { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+                .kpi-stat.btag { background: var(--status-processing-bg); }
+                .kpi-stat.btag .kpi-value { color: var(--status-processing); }
 
                 .detail-grid {
                     display: grid;

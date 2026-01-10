@@ -210,6 +210,39 @@ app.get('/api/client/:clientId/ip-analysis', async (req, res) => {
 });
 
 /**
+ * GET /api/client/:clientId/kpi
+ * Üye finansal KPI verileri
+ */
+app.get('/api/client/:clientId/kpi', async (req, res) => {
+    try {
+        const clientId = parseInt(req.params.clientId);
+        const kpi = await bcClient.getClientKpi(clientId);
+
+        if (!kpi) {
+            return res.json({ success: false, error: 'KPI data not found' });
+        }
+
+        res.json({
+            success: true,
+            data: {
+                depositAmount: kpi.DepositAmount,
+                depositCount: kpi.DepositCount,
+                withdrawalAmount: kpi.WithdrawalAmount,
+                withdrawalCount: kpi.WithdrawalCount,
+                lastWithdrawalAmount: kpi.LastWithdrawalAmount,
+                lastWithdrawalTime: kpi.LastWithdrawalTimeLocal,
+                totalSportBets: kpi.TotalSportBets,
+                totalUnsettledBets: kpi.TotalUnsettledBets,
+                btag: kpi.BTag
+            }
+        });
+    } catch (error) {
+        logger.error('Client KPI API Error', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
  * GET /api/client/:clientId/bonus-transactions
  * Son yatırımdan sonraki FreeSpin ve Bonus işlemleri
  */

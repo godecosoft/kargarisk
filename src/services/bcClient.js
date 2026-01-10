@@ -150,6 +150,36 @@ class BCClient {
         const response = await this.post('/Client/GetClientsByIPAddress', payload);
         return response.Data?.Objects || [];
     }
+
+    /**
+     * Get client KPI (financial summary)
+     * @param {number} clientId - Client ID
+     */
+    async getClientKpi(clientId) {
+        const token = await tokenService.getToken();
+        const url = `${this.baseUrl}/Client/GetClientKpi?id=${clientId}`;
+
+        try {
+            const response = await axios.get(url, {
+                headers: {
+                    'authentication': token,
+                    'Content-Type': 'application/json',
+                    'Origin': 'https://backoffice.betcostatic.com',
+                    'Referer': 'https://backoffice.betcostatic.com/'
+                },
+                timeout: 15000
+            });
+
+            if (response.data?.HasError) {
+                throw new Error(response.data?.AlertMessage || 'KPI API Error');
+            }
+
+            return response.data?.Data || null;
+        } catch (error) {
+            logger.error('GetClientKpi error', { clientId, error: error.message });
+            return null;
+        }
+    }
 }
 const bcClient = new BCClient();
 
