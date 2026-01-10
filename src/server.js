@@ -559,8 +559,17 @@ async function startServer() {
         await db.initDatabase();
 
         // Server'ı başlat
+        // Start Background Workers
+        try {
+            const autoApprovalWorker = require('./workers/autoApprovalWorker');
+            autoApprovalWorker.start();
+            logger.info('AutoApprovalWorker started');
+        } catch (error) {
+            logger.error('Failed to start workers', { error: error.message });
+        }
+
         app.listen(PORT, () => {
-            logger.info(`API Server running on http://localhost:${PORT}`);
+            logger.info(`Server running on port ${PORT}`);
         });
 
     } catch (error) {
