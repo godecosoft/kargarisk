@@ -3,6 +3,7 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import WithdrawalsPage from './pages/WithdrawalsPage';
 import AutoControlPage from './pages/AutoControlPage';
+import CompactDetailPage from './pages/CompactDetailPage';
 import ReportsPage from './pages/ReportsPage';
 import RuleEnginePage from './pages/RuleEnginePage';
 import './index.css';
@@ -28,8 +29,8 @@ function App() {
       case 'autocontrol':
         return <AutoControlPage />;
       case 'detail':
-        return <AutoControlPage
-          singleWithdrawal={selectedWithdrawal}
+        return <CompactDetailPage
+          withdrawal={selectedWithdrawal}
           onBack={handleBackToList}
         />;
       case 'reports':
