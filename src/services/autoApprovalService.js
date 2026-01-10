@@ -141,25 +141,49 @@ function evaluateRules(withdrawal, snapshot, rules) {
         }
     }
 
-    // 3. NO_BONUS_AFTER_DEPOSIT - Check bonuses
+    // 4. NO_BONUS_AFTER_DEPOSIT - Check bonuses AFTER deposit
     if (rules.NO_BONUS_AFTER_DEPOSIT?.enabled) {
         const bonuses = snapshot?.bonuses || [];
-        if (bonuses.length === 0) {
-            result.passedRules.push('NO_BONUS_AFTER_DEPOSIT: Bonus yok');
+        const depositTime = snapshot?.turnover?.deposit?.time || snapshot?.deposit?.time;
+
+        // Filter bonuses that were given AFTER the deposit
+        let bonusesAfterDeposit = bonuses;
+        if (depositTime) {
+            const depositDate = new Date(depositTime);
+            bonusesAfterDeposit = bonuses.filter(b => {
+                const bonusDate = new Date(b.time || b.createdTime || b.CreateTime || 0);
+                return bonusDate > depositDate;
+            });
+        }
+
+        if (bonusesAfterDeposit.length === 0) {
+            result.passedRules.push('NO_BONUS_AFTER_DEPOSIT: Yatırım sonrası bonus yok');
         } else {
             result.passed = false;
-            result.failedRules.push(`NO_BONUS_AFTER_DEPOSIT: ${bonuses.length} bonus bulundu`);
+            result.failedRules.push(`NO_BONUS_AFTER_DEPOSIT: Yatırım sonrası ${bonusesAfterDeposit.length} bonus bulundu`);
         }
     }
 
-    // 4. NO_FREESPIN_BONUS - Check FreeSpin/PayClientBonus transactions
+    // 5. NO_FREESPIN_BONUS - Check FreeSpin/PayClientBonus transactions AFTER deposit
     if (rules.NO_FREESPIN_BONUS?.enabled) {
         const bonusTx = snapshot?.bonusTransactions?.data || snapshot?.bonusTransactions || [];
-        if (bonusTx.length === 0) {
-            result.passedRules.push('NO_FREESPIN_BONUS: FreeSpin/Bonus işlemi yok');
+        const depositTime = snapshot?.turnover?.deposit?.time || snapshot?.deposit?.time;
+
+        // Filter transactions that occurred AFTER the deposit
+        let txAfterDeposit = bonusTx;
+        if (depositTime) {
+            const depositDate = new Date(depositTime);
+            txAfterDeposit = bonusTx.filter(tx => {
+                const txDate = new Date(tx.time || tx.CreateTime || tx.createdTime || 0);
+                return txDate > depositDate;
+            });
+        }
+
+        if (txAfterDeposit.length === 0) {
+            result.passedRules.push('NO_FREESPIN_BONUS: Yatırım sonrası FreeSpin/Bonus işlemi yok');
         } else {
             result.passed = false;
-            result.failedRules.push(`NO_FREESPIN_BONUS: ${bonusTx.length} işlem bulundu`);
+            result.failedRules.push(`NO_FREESPIN_BONUS: Yatırım sonrası ${txAfterDeposit.length} işlem bulundu`);
         }
     }
 
