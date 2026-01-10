@@ -150,8 +150,21 @@ export default function BonusRulesPage() {
                                 <div className="rule-settings">
                                     <div className="setting-row">
                                         <span className="setting-label"><DollarSign size={12} /> Max Çekim:</span>
-                                        <span className="setting-value">₺{rule.max_amount}</span>
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                            <span className="setting-value">₺{rule.max_amount}</span>
+                                            {rule.max_withdrawal_multiplier > 0 && (
+                                                <small style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
+                                                    ({rule.max_withdrawal_multiplier}x Yatırım)
+                                                </small>
+                                            )}
+                                        </div>
                                     </div>
+                                    {rule.turnover_multiplier > 0 && (
+                                        <div className="setting-row">
+                                            <span className="setting-label"><ShieldAlert size={12} /> Çevrim:</span>
+                                            <span className="setting-value">{rule.turnover_multiplier} Katı</span>
+                                        </div>
+                                    )}
                                     <div className="setting-row">
                                         <span className="setting-label"><ShieldAlert size={12} /> Yatırım Şartı:</span>
                                         <span className={`setting-value ${rule.ignore_deposit_rule ? 'success' : 'warning'}`}>
@@ -217,12 +230,35 @@ export default function BonusRulesPage() {
                                 <small>Not: Bu kelime bonus açıklamasında, oyun adında veya ödeme yönteminde geçiyorsa kural devreye girer.</small>
                             </div>
                             <div className="form-group">
-                                <label>Maksimum Çekim Tutarı (TL)</label>
+                                <label>Maksimum Çekim Tutarı (TL) - Sabit Limit</label>
                                 <input
                                     type="number"
                                     value={formData.max_amount}
                                     onChange={e => setFormData({ ...formData, max_amount: e.target.value })}
                                 />
+                            </div>
+
+                            <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div className="form-group">
+                                    <label>Çevrim Şartı (Katı)</label>
+                                    <input
+                                        type="number"
+                                        placeholder="Örn: 10"
+                                        value={formData.turnover_multiplier}
+                                        onChange={e => setFormData({ ...formData, turnover_multiplier: e.target.value })}
+                                    />
+                                    <small>Yatırımın kaç katı çevrim gerekli?</small>
+                                </div>
+                                <div className="form-group">
+                                    <label>Max Çekim (Yatırım Katı)</label>
+                                    <input
+                                        type="number"
+                                        placeholder="Örn: 20"
+                                        value={formData.max_withdrawal_multiplier}
+                                        onChange={e => setFormData({ ...formData, max_withdrawal_multiplier: e.target.value })}
+                                    />
+                                    <small>Yatırımın en fazla kaç katı çekilebilir?</small>
+                                </div>
                             </div>
 
                             <div className="form-check-group">

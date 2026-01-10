@@ -38,19 +38,27 @@ const bonusRulesService = {
      * Add a new bonus rule
      */
     async addRule(ruleData) {
-        const { name, match_keyword, max_amount, ignore_deposit_rule, auto_approval_enabled } = ruleData;
+        const {
+            name, match_keyword, max_amount, ignore_deposit_rule, auto_approval_enabled,
+            turnover_multiplier, min_withdrawal_multiplier, max_withdrawal_multiplier
+        } = ruleData;
+
         try {
             const sql = `
                 INSERT INTO bonus_rules 
-                (name, match_keyword, max_amount, ignore_deposit_rule, auto_approval_enabled, is_active)
-                VALUES (?, ?, ?, ?, ?, true)
+                (name, match_keyword, max_amount, ignore_deposit_rule, auto_approval_enabled, 
+                 turnover_multiplier, min_withdrawal_multiplier, max_withdrawal_multiplier, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, true)
             `;
             const result = await db.query(sql, [
                 name,
-                match_keyword.toUpperCase(), // Store keywords in uppercase
+                match_keyword.toUpperCase(),
                 max_amount || 0,
                 ignore_deposit_rule || false,
-                auto_approval_enabled || false
+                auto_approval_enabled || false,
+                turnover_multiplier || 0,
+                min_withdrawal_multiplier || 0,
+                max_withdrawal_multiplier || 0
             ]);
             return result.insertId;
         } catch (error) {
@@ -73,6 +81,11 @@ const bonusRulesService = {
             if (updates.ignore_deposit_rule !== undefined) { fields.push('ignore_deposit_rule = ?'); values.push(updates.ignore_deposit_rule); }
             if (updates.auto_approval_enabled !== undefined) { fields.push('auto_approval_enabled = ?'); values.push(updates.auto_approval_enabled); }
             if (updates.is_active !== undefined) { fields.push('is_active = ?'); values.push(updates.is_active); }
+
+            // New fields
+            if (updates.turnover_multiplier !== undefined) { fields.push('turnover_multiplier = ?'); values.push(updates.turnover_multiplier); }
+            if (updates.min_withdrawal_multiplier !== undefined) { fields.push('min_withdrawal_multiplier = ?'); values.push(updates.min_withdrawal_multiplier); }
+            if (updates.max_withdrawal_multiplier !== undefined) { fields.push('max_withdrawal_multiplier = ?'); values.push(updates.max_withdrawal_multiplier); }
 
             if (fields.length === 0) return false;
 

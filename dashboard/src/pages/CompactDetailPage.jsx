@@ -156,7 +156,32 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
 
             {/* Decision Reason */}
             {decisionReason && (
-                <div className="decision-reason">{decisionReason}</div>
+                <div className="decision-reason">
+                    {decisionReason}
+                    {/* Show Risk Details if available */}
+                    {(turnover?.decisionData?.riskAnalysis?.details || withdrawal?.decisionData?.riskAnalysis?.details || []).map((detail, idx) => (
+                        <div key={idx} className="risk-detail-item" style={{ color: 'var(--status-rejected)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <AlertTriangle size={14} /> {detail}
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* HIGH RISK BANNER */}
+            {(turnover?.decisionData?.riskAnalysis?.isRisky || withdrawal?.decisionData?.riskAnalysis?.isRisky) && (
+                <div className="risk-banner" style={{
+                    background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--status-rejected)',
+                    borderRadius: 'var(--radius-md)', padding: '12px', marginBottom: '20px',
+                    display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--status-rejected)'
+                }}>
+                    <AlertTriangle size={24} />
+                    <div>
+                        <div style={{ fontWeight: '700' }}>RİSK TESPİT EDİLDİ (Spin Gömme Şüphesi)</div>
+                        <div style={{ fontSize: '13px', opacity: 0.9 }}>
+                            Bu çekim talebinde riskli oyuncu davranışları tespit edildi. Lütfen dikkatle inceleyiniz.
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Client KPI Stats Bar */}

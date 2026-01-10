@@ -7,6 +7,7 @@ const db = require('../db/mysql');
 const bcClient = require('./bcClient');
 const logger = require('../utils/logger');
 const bonusRulesService = require('./bonusRulesService');
+const riskService = require('./riskService');
 
 /**
  * Get all auto-approval rules from DB
@@ -341,6 +342,26 @@ async function processAutoApproval(withdrawal, snapshot) {
         let matchedBonusRule = null;
         const withdrawalType = snapshot?.turnover?.withdrawalType?.type;
         const isBonusOrFreeSpin = withdrawalType === 'BONUS' || withdrawalType === 'FREESPIN';
+
+        // 0. RISK ANALYSIS (Spin Hoarding Detection)
+        // Perform risk analysis before rules
+        const riskAnalysis = riskService.analyzeRisk(withdrawal, snapshot);
+        if (riskAnalysis.isRisky) {
+            logger.info(`[AutoApproval] RISK DETECTED for ${withdrawal.Id}:`, riskAnalysis.details);
+
+            // If HIGH risk (significant win without bet), fail immediately
+            if (riskAnalysis.totalRiskLevel === 'HIGH') {
+                return {
+                    approved: false,
+                    reason: `RISK TESPİT EDİLDİ: ${riskAnalysis.details.join(', ')}`,
+                    ruleResult: {
+                        passed: false,
+                        failedRules: [`RISK: ${riskAnalysis.details.join(', ')}`]
+                    },
+                    riskAnalysis
+                };
+            }
+        }
 
         if (isBonusOrFreeSpin) {
             // Use the "fake" deposit object which contains bonus details (Game, PaymentSystemName, Notes)

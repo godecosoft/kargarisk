@@ -224,6 +224,19 @@ async function runMigrations() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
 
+        // Add new columns if they don't exist (Migration logic)
+        try {
+            await pool.query(`
+                ALTER TABLE bonus_rules
+                ADD COLUMN turnover_multiplier DECIMAL(5,2) DEFAULT 0,
+                ADD COLUMN min_withdrawal_multiplier DECIMAL(5,2) DEFAULT 0,
+                ADD COLUMN max_withdrawal_multiplier DECIMAL(5,2) DEFAULT 0
+            `);
+        } catch (e) {
+            // Ignore "Duplicate column name" error (Code: 1060)
+            if (e.errno !== 1060) console.error('[DB] Column update error:', e.message);
+        }
+
         console.log('[DB] Migrations completed - all tables ready including auto_approvals');
     } catch (error) {
         console.error('[DB] Migration hatası:', error.message);
