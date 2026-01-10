@@ -189,19 +189,28 @@ async function runMigrations() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
 
-        // Seed default rules
-        await pool.query(`
-            INSERT IGNORE INTO auto_approval_rules (rule_key, rule_name, rule_value, is_enabled, description) VALUES
-            ('AUTO_APPROVAL_ENABLED', 'Otomatik Onay Sistemi', 'true', FALSE, 'Ana aç/kapa - Kapalı olduğunda hiçbir çekim otomatik onaylanmaz'),
-            ('MAX_AMOUNT', 'Maksimum Tutar', '5000', TRUE, 'Otomatik onay için maksimum çekim tutarı (TL)'),
-            ('MAX_WITHDRAWAL_RATIO', 'Yatırım/Çekim Oranı', '30', TRUE, 'Çekim tutarı yatırımın bu katını aşarsa manuel onaya gider'),
-            ('REQUIRE_DEPOSIT_TODAY', 'Bugün Yatırım Şartı', 'true', TRUE, 'Gün içinde yatırım yapılmış olmalı'),
-            ('NO_BONUS_AFTER_DEPOSIT', 'Bonus Kontrolü', 'true', TRUE, 'Yatırım sonrası bonus alınmamış olmalı'),
-            ('NO_FREESPIN_BONUS', 'FreeSpin/Bonus İşlemi', 'true', TRUE, 'FreeSpin veya Pay Client Bonus işlemi olmamalı'),
-            ('NO_SPORTS_BETS', 'Spor Bahisi Kontrolü', 'true', TRUE, 'Spor bahisi yapılmamış olmalı'),
-            ('FORBIDDEN_GAMES', 'Yasaklı Oyunlar', 'Roulette,Rulet,Blackjack,Aviator,Aviabet,Baccarat', TRUE, 'Bu kelimeleri içeren oyunlar yasaklı'),
-            ('TURNOVER_COMPLETE', 'Çevrim Kontrolü', '100', TRUE, 'Minimum çevrim yüzdesi')
-        `);
+        // Seed default rules - uses ON DUPLICATE to ensure all exist
+        const rules = [
+            ['AUTO_APPROVAL_ENABLED', 'Otomatik Onay Sistemi', 'true', false, 'Ana aç/kapa - Kapalı olduğunda hiçbir çekim otomatik onaylanmaz'],
+            ['MAX_AMOUNT', 'Maksimum Tutar', '5000', true, 'Otomatik onay için maksimum çekim tutarı (TL)'],
+            ['MAX_WITHDRAWAL_RATIO', 'Yatırım/Çekim Oranı', '30', true, 'Çekim tutarı yatırımın bu katını aşarsa manuel onaya gider'],
+            ['REQUIRE_DEPOSIT_TODAY', 'Bugün Yatırım Şartı', 'true', true, 'Gün içinde yatırım yapılmış olmalı'],
+            ['NO_BONUS_AFTER_DEPOSIT', 'Bonus Kontrolü', 'true', true, 'Yatırım sonrası bonus alınmamış olmalı'],
+            ['NO_FREESPIN_BONUS', 'FreeSpin/PayClient Bonus', 'true', true, 'FreeSpin veya Pay Client Bonus işlemi olmamalı'],
+            ['NO_SPORTS_BETS', 'Spor Bahisi Kontrolü', 'true', true, 'Spor bahisi yapılmamış olmalı'],
+            ['FORBIDDEN_GAMES', 'Yasaklı Oyunlar', 'Roulette,Rulet,Blackjack,Aviator,Aviabet,Baccarat', true, 'Bu kelimeleri içeren oyunlar yasaklı'],
+            ['TURNOVER_COMPLETE', 'Çevrim Kontrolü', '100', true, 'Minimum çevrim yüzdesi']
+        ];
+
+        for (const [key, name, value, enabled, desc] of rules) {
+            await pool.query(`
+                INSERT INTO auto_approval_rules (rule_key, rule_name, rule_value, is_enabled, description) 
+                VALUES (?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE 
+                    rule_name = VALUES(rule_name),
+                    description = VALUES(description)
+            `, [key, name, value, enabled, desc]);
+        }
 
         console.log('[DB] Migrations completed - all tables ready including auto_approvals');
     } catch (error) {
