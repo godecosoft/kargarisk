@@ -192,6 +192,7 @@ async function runMigrations() {
         // Seed default rules
         await pool.query(`
             INSERT IGNORE INTO auto_approval_rules (rule_key, rule_name, rule_value, is_enabled, description) VALUES
+            ('AUTO_APPROVAL_ENABLED', 'Otomatik Onay Sistemi', 'true', FALSE, 'Ana aç/kapa - Kapalı olduğunda hiçbir çekim otomatik onaylanmaz'),
             ('MAX_AMOUNT', 'Maksimum Tutar', '5000', TRUE, 'Otomatik onay için maksimum çekim tutarı (TL)'),
             ('REQUIRE_DEPOSIT_TODAY', 'Bugün Yatırım Şartı', 'true', TRUE, 'Gün içinde yatırım yapılmış olmalı'),
             ('NO_BONUS_AFTER_DEPOSIT', 'Bonus Kontrolü', 'true', TRUE, 'Yatırım sonrası bonus alınmamış olmalı'),

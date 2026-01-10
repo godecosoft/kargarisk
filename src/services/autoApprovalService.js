@@ -213,6 +213,16 @@ async function processAutoApproval(withdrawal, snapshot) {
         // Get current rules
         const rules = await getRules();
 
+        // Check master toggle first
+        if (!rules.AUTO_APPROVAL_ENABLED?.enabled) {
+            logger.info(`[AutoApproval] System disabled, skipping withdrawal ${withdrawal.Id}`);
+            return {
+                approved: false,
+                reason: 'Otomatik onay sistemi kapalı',
+                ruleResult: { passed: false, failedRules: ['AUTO_APPROVAL_ENABLED: Sistem kapalı'] }
+            };
+        }
+
         // Evaluate rules
         const ruleResult = evaluateRules(withdrawal, snapshot, rules);
 
