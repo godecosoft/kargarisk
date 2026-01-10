@@ -147,6 +147,8 @@ async function createSnapshot(withdrawal) {
 
         // If decision is ONAY, trigger auto-approval
         let autoApprovalResult = null;
+        logger.info(`[SnapshotService] Checking auto-approval eligibility: decision=${botDecision}, isONAY=${botDecision === 'ONAY'}`);
+
         if (botDecision === 'ONAY') {
             try {
                 const autoApprovalService = require('./autoApprovalService');
@@ -158,10 +160,12 @@ async function createSnapshot(withdrawal) {
                     ipAnalysis: ipRes
                 };
                 autoApprovalResult = await autoApprovalService.processAutoApproval(withdrawal, snapshotData);
-                logger.info(`[SnapshotService] Auto-approval result for ${withdrawalId}:`, autoApprovalResult);
+                logger.info(`[SnapshotService] Auto-approval result for ${withdrawalId}:`, JSON.stringify(autoApprovalResult));
             } catch (autoErr) {
                 logger.error(`[SnapshotService] Auto-approval error for ${withdrawalId}:`, autoErr.message);
             }
+        } else {
+            logger.info(`[SnapshotService] Skipping auto-approval for ${withdrawalId}: decision is ${botDecision}, not ONAY`);
         }
 
         return {
