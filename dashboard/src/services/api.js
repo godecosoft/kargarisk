@@ -130,3 +130,39 @@ export async function fetchClientKpi(clientId) {
     if (!response.ok) throw new Error('Failed to fetch client KPI');
     return response.json();
 }
+
+// ============================================
+// AUTO-APPROVAL API
+// ============================================
+
+export async function fetchAutoApprovalRules() {
+    const response = await fetch(`${API_BASE}/auto-approval/rules`);
+    if (!response.ok) throw new Error('Failed to fetch auto-approval rules');
+    return response.json();
+}
+
+export async function updateAutoApprovalRule(ruleKey, value, enabled) {
+    const response = await fetch(`${API_BASE}/auto-approval/rules/${ruleKey}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value, enabled })
+    });
+    if (!response.ok) throw new Error('Failed to update rule');
+    return response.json();
+}
+
+export async function triggerAutoApproval(withdrawalId, withdrawal) {
+    const response = await fetch(`${API_BASE}/withdrawal/${withdrawalId}/auto-approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(withdrawal)
+    });
+    if (!response.ok) throw new Error('Auto-approval failed');
+    return response.json();
+}
+
+export async function fetchAutoApprovalHistory(limit = 50) {
+    const response = await fetch(`${API_BASE}/auto-approval/history?limit=${limit}`);
+    if (!response.ok) throw new Error('Failed to fetch approval history');
+    return response.json();
+}

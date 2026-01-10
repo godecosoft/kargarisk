@@ -145,12 +145,32 @@ async function createSnapshot(withdrawal) {
 
         logger.info(`[SnapshotService] Snapshot created: withdrawal=${withdrawalId}, decision=${botDecision}`);
 
+        // If decision is ONAY, trigger auto-approval
+        let autoApprovalResult = null;
+        if (botDecision === 'ONAY') {
+            try {
+                const autoApprovalService = require('./autoApprovalService');
+                const snapshotData = {
+                    turnover: turnoverRes,
+                    bonuses: bonusesRes,
+                    bonusTransactions: bonusTxRes,
+                    sports: sportsRes,
+                    ipAnalysis: ipRes
+                };
+                autoApprovalResult = await autoApprovalService.processAutoApproval(withdrawal, snapshotData);
+                logger.info(`[SnapshotService] Auto-approval result for ${withdrawalId}:`, autoApprovalResult);
+            } catch (autoErr) {
+                logger.error(`[SnapshotService] Auto-approval error for ${withdrawalId}:`, autoErr.message);
+            }
+        }
+
         return {
             success: true,
             decision: botDecision,
             reason: decisionReason,
             withdrawalType,
-            fromCache: false
+            fromCache: false,
+            autoApproval: autoApprovalResult
         };
     } catch (error) {
         logger.error('[SnapshotService] createSnapshot error:', error.message);

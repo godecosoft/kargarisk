@@ -160,7 +160,48 @@ async function runMigrations() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
 
-        console.log('[DB] Migrations completed - decisions, rules ve withdrawals tabloları hazır');
+        // Auto Approvals Log Table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS auto_approvals (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                withdrawal_id BIGINT NOT NULL,
+                client_id BIGINT NOT NULL,
+                client_login VARCHAR(100),
+                amount DECIMAL(12,2),
+                rules_passed JSON,
+                approved_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                bc_response JSON,
+                INDEX idx_withdrawal (withdrawal_id),
+                INDEX idx_approved (approved_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
+
+        // Auto Approval Rules Table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS auto_approval_rules (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                rule_key VARCHAR(50) UNIQUE NOT NULL,
+                rule_name VARCHAR(100) NOT NULL,
+                rule_value TEXT,
+                is_enabled BOOLEAN DEFAULT TRUE,
+                description TEXT,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
+
+        // Seed default rules
+        await pool.query(`
+            INSERT IGNORE INTO auto_approval_rules (rule_key, rule_name, rule_value, is_enabled, description) VALUES
+            ('MAX_AMOUNT', 'Maksimum Tutar', '5000', TRUE, 'Otomatik onay için maksimum çekim tutarı (TL)'),
+            ('REQUIRE_DEPOSIT_TODAY', 'Bugün Yatırım Şartı', 'true', TRUE, 'Gün içinde yatırım yapılmış olmalı'),
+            ('NO_BONUS_AFTER_DEPOSIT', 'Bonus Kontrolü', 'true', TRUE, 'Yatırım sonrası bonus alınmamış olmalı'),
+            ('NO_FREESPIN_BONUS', 'FreeSpin/Bonus İşlemi', 'true', TRUE, 'FreeSpin veya Pay Client Bonus işlemi olmamalı'),
+            ('NO_SPORTS_BETS', 'Spor Bahisi Kontrolü', 'true', TRUE, 'Spor bahisi yapılmamış olmalı'),
+            ('FORBIDDEN_GAMES', 'Yasaklı Oyunlar', 'Roulette,Rulet,Blackjack,Aviator,Aviabet,Baccarat', TRUE, 'Bu kelimeleri içeren oyunlar yasaklı'),
+            ('TURNOVER_COMPLETE', 'Çevrim Kontrolü', '100', TRUE, 'Minimum çevrim yüzdesi')
+        `);
+
+        console.log('[DB] Migrations completed - all tables ready including auto_approvals');
     } catch (error) {
         console.error('[DB] Migration hatası:', error.message);
     }

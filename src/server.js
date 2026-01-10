@@ -428,6 +428,91 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Internal Server Error' });
 });
 
+// ============================================
+// AUTO-APPROVAL ENDPOINTS
+// ============================================
+
+const autoApprovalService = require('./services/autoApprovalService');
+
+/**
+ * GET /api/auto-approval/rules
+ * Get all auto-approval rules
+ */
+app.get('/api/auto-approval/rules', async (req, res) => {
+    try {
+        const rules = await autoApprovalService.getRules();
+        res.json({ success: true, rules });
+    } catch (error) {
+        logger.error('Get auto-approval rules error', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * PUT /api/auto-approval/rules/:ruleKey
+ * Update a rule
+ */
+app.put('/api/auto-approval/rules/:ruleKey', async (req, res) => {
+    try {
+        const { ruleKey } = req.params;
+        const { value, enabled } = req.body;
+
+        const success = await autoApprovalService.updateRule(ruleKey, value, enabled);
+        res.json({ success });
+    } catch (error) {
+        logger.error('Update auto-approval rule error', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST /api/withdrawal/:id/auto-approve
+ * Evaluate and auto-approve a withdrawal
+ */
+app.post('/api/withdrawal/:id/auto-approve', async (req, res) => {
+    try {
+        const withdrawalId = parseInt(req.params.id);
+        const withdrawal = req.body; // Full withdrawal object
+
+        // Get snapshot for rule evaluation
+        const snapshotService = require('./services/withdrawalSnapshotService');
+        const snapshot = await snapshotService.getSnapshot(withdrawalId);
+
+        if (!snapshot) {
+            return res.json({
+                success: false,
+                approved: false,
+                reason: 'Snapshot bulunamadı'
+            });
+        }
+
+        const result = await autoApprovalService.processAutoApproval(withdrawal, snapshot);
+
+        res.json({
+            success: true,
+            ...result
+        });
+    } catch (error) {
+        logger.error('Auto-approve error', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * GET /api/auto-approval/history
+ * Get auto-approval history
+ */
+app.get('/api/auto-approval/history', async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 50;
+        const history = await autoApprovalService.getApprovalHistory(limit);
+        res.json({ success: true, data: history });
+    } catch (error) {
+        logger.error('Get auto-approval history error', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // Server başlat
 async function startServer() {
     try {

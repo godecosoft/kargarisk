@@ -180,6 +180,23 @@ class BCClient {
             return null;
         }
     }
+
+    /**
+     * Pay (approve) a withdrawal request
+     * @param {Object} withdrawal - Full withdrawal object from GetClientWithdrawalRequests
+     * @returns {Object} BC API response
+     */
+    async payWithdrawalRequest(withdrawal) {
+        logger.info('Approving withdrawal', { id: withdrawal.Id, amount: withdrawal.Amount });
+
+        const response = await this.post('/Client/PayWithdrawalRequests', withdrawal);
+
+        if (response.HasError) {
+            throw new Error(response.AlertMessage || 'Withdrawal approval failed');
+        }
+
+        return response;
+    }
 }
 const bcClient = new BCClient();
 
