@@ -8,7 +8,8 @@ import {
     Shield,
     Bell,
     HelpCircle,
-    Zap
+    Zap,
+    CheckCircle
 } from 'lucide-react';
 
 function Sidebar({ currentPage, onNavigate }) {
@@ -27,6 +28,7 @@ function Sidebar({ currentPage, onNavigate }) {
             section: 'Yönetim',
             items: [
                 { id: 'rules', icon: Shield, label: 'Kural Motoru' },
+                { id: 'auto-history', icon: CheckCircle, label: 'Oto-Onay Geçmişi' },
                 { id: 'logs', icon: FileText, label: 'İşlem Logları' },
                 { id: 'settings', icon: Settings, label: 'Ayarlar' },
             ]

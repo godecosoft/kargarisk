@@ -194,6 +194,7 @@ async function runMigrations() {
             INSERT IGNORE INTO auto_approval_rules (rule_key, rule_name, rule_value, is_enabled, description) VALUES
             ('AUTO_APPROVAL_ENABLED', 'Otomatik Onay Sistemi', 'true', FALSE, 'Ana aç/kapa - Kapalı olduğunda hiçbir çekim otomatik onaylanmaz'),
             ('MAX_AMOUNT', 'Maksimum Tutar', '5000', TRUE, 'Otomatik onay için maksimum çekim tutarı (TL)'),
+            ('MAX_WITHDRAWAL_RATIO', 'Yatırım/Çekim Oranı', '30', TRUE, 'Çekim tutarı yatırımın bu katını aşarsa manuel onaya gider'),
             ('REQUIRE_DEPOSIT_TODAY', 'Bugün Yatırım Şartı', 'true', TRUE, 'Gün içinde yatırım yapılmış olmalı'),
             ('NO_BONUS_AFTER_DEPOSIT', 'Bonus Kontrolü', 'true', TRUE, 'Yatırım sonrası bonus alınmamış olmalı'),
             ('NO_FREESPIN_BONUS', 'FreeSpin/Bonus İşlemi', 'true', TRUE, 'FreeSpin veya Pay Client Bonus işlemi olmamalı'),

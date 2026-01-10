@@ -106,7 +106,26 @@ function evaluateRules(withdrawal, snapshot, rules) {
         }
     }
 
-    // 2. REQUIRE_DEPOSIT_TODAY - Check if deposit was made today
+    // 2. MAX_WITHDRAWAL_RATIO - Check if withdrawal > Nx deposit amount
+    if (rules.MAX_WITHDRAWAL_RATIO?.enabled) {
+        const maxRatio = parseFloat(rules.MAX_WITHDRAWAL_RATIO.value) || 30;
+        const depositAmount = snapshot?.turnover?.deposit?.amount || snapshot?.deposit?.amount || 0;
+
+        if (depositAmount > 0) {
+            const actualRatio = withdrawal.Amount / depositAmount;
+            if (actualRatio <= maxRatio) {
+                result.passedRules.push(`MAX_WITHDRAWAL_RATIO: ${actualRatio.toFixed(1)}x <= ${maxRatio}x`);
+            } else {
+                result.passed = false;
+                result.failedRules.push(`MAX_WITHDRAWAL_RATIO: ₺${withdrawal.Amount} > ${maxRatio}x yatırım (₺${depositAmount})`);
+            }
+        } else {
+            result.passed = false;
+            result.failedRules.push('MAX_WITHDRAWAL_RATIO: Yatırım bulunamadı');
+        }
+    }
+
+    // 3. REQUIRE_DEPOSIT_TODAY - Check if deposit was made today
     if (rules.REQUIRE_DEPOSIT_TODAY?.enabled) {
         const depositTime = snapshot?.turnover?.deposit?.time || snapshot?.deposit?.time;
         if (isDepositToday(depositTime)) {

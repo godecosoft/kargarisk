@@ -75,7 +75,7 @@ function StatusBadge({ state }) {
     );
 }
 
-function DecisionBadge({ decision, loading, isChecking }) {
+function DecisionBadge({ decision, loading, isChecking, autoApproved }) {
     if (loading) {
         return <span className="decision-badge loading"><Loader2 size={12} className="spinner" /></span>;
     }
@@ -91,6 +91,16 @@ function DecisionBadge({ decision, loading, isChecking }) {
 
     if (!decision) {
         return <span className="decision-badge unknown">-</span>;
+    }
+
+    // Auto-approved has special styling
+    if (autoApproved) {
+        return (
+            <span className="decision-badge auto-approve">
+                <Zap size={10} />
+                OTO-ONAY
+            </span>
+        );
     }
 
     const config = {
@@ -504,6 +514,7 @@ function WithdrawalsPage({ onViewDetail }) {
                                                 decision={decisions[w.Id]?.decision}
                                                 loading={decisions[w.Id]?.loading}
                                                 isChecking={checkingId === w.Id}
+                                                autoApproved={decisions[w.Id]?.autoApproved}
                                             />
                                         </td>
                                         <td style={{ color: 'var(--text-secondary)' }}>
@@ -646,6 +657,14 @@ function WithdrawalsPage({ onViewDetail }) {
                 }
                 .decision-badge.unknown {
                     color: var(--text-muted);
+                }
+                .decision-badge.auto-approve {
+                    background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.3));
+                    color: #f59e0b;
+                    border: 1px solid rgba(245, 158, 11, 0.5);
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
                 }
                 
                 .pulse-icon {

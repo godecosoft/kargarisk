@@ -6,6 +6,7 @@ import AutoControlPage from './pages/AutoControlPage';
 import CompactDetailPage from './pages/CompactDetailPage';
 import ReportsPage from './pages/ReportsPage';
 import RuleEnginePage from './pages/RuleEnginePage';
+import AutoApprovalHistoryPage from './pages/AutoApprovalHistoryPage';
 import './index.css';
 
 function App() {
@@ -37,6 +38,8 @@ function App() {
         return <ReportsPage />;
       case 'rules':
         return <RuleEnginePage />;
+      case 'auto-history':
+        return <AutoApprovalHistoryPage />;
       default:
         return <WithdrawalsPage onViewDetail={handleViewDetail} />;
     }

@@ -84,6 +84,7 @@ function RuleEnginePage() {
 
     const ruleIcons = {
         MAX_AMOUNT: DollarSign,
+        MAX_WITHDRAWAL_RATIO: DollarSign,
         REQUIRE_DEPOSIT_TODAY: RefreshCw,
         NO_BONUS_AFTER_DEPOSIT: Gift,
         NO_FREESPIN_BONUS: Zap,
@@ -215,6 +216,25 @@ function RuleEnginePage() {
                             />
                             <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>
                                 Bu tutarın üzerindeki çekimler manuel onaya gider.
+                            </div>
+                        </div>
+
+                        {/* Max Withdrawal Ratio */}
+                        <div style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', marginBottom: '12px' }}>
+                            <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                                Maksimum Yatırım/Çekim Oranı (x)
+                            </label>
+                            <input
+                                type="number"
+                                step="5"
+                                min="1"
+                                value={autoRules.MAX_WITHDRAWAL_RATIO?.value || 30}
+                                onChange={(e) => handleUpdateRuleValue('MAX_WITHDRAWAL_RATIO', e.target.value)}
+                                className="filter-input"
+                                style={{ width: '100%', fontSize: '16px', padding: '10px' }}
+                            />
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                                Çekim tutarı yatırımın bu katını aşarsa manuel onaya gider. (Örn: 30 = yatırımın 30 katına kadar)
                             </div>
                         </div>
 

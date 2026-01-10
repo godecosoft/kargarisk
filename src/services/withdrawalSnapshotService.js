@@ -265,7 +265,8 @@ async function getDecisionsBatch(withdrawals) {
                     decision: snapshot.decision,
                     reason: snapshot.reason,
                     withdrawalType: snapshot.withdrawalType,
-                    fromCache: false
+                    fromCache: false,
+                    autoApproved: snapshot.autoApproval?.approved || false
                 };
             } else {
                 // Failed to create snapshot - save MANUEL decision with error message
