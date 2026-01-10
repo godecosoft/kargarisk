@@ -111,33 +111,58 @@ function evaluateRules(withdrawal, snapshot, rules) {
         }
     }
 
+    // Check for fake deposit (Bonus/FreeSpin turnover reference)
+    const withdrawalType = snapshot?.turnover?.withdrawalType?.type;
+    const isBonusWithdrawal = withdrawalType === 'BONUS' || withdrawalType === 'FREESPIN';
+
     // 2. MAX_WITHDRAWAL_RATIO - Check if withdrawal > Nx deposit amount
     if (rules.MAX_WITHDRAWAL_RATIO?.enabled) {
-        const maxRatio = parseFloat(rules.MAX_WITHDRAWAL_RATIO.value) || 30;
-        const depositAmount = snapshot?.turnover?.deposit?.amount || snapshot?.deposit?.amount || 0;
+        // If it's a Bonus/FreeSpin withdrawal, there is NO deposit, so ratio is invalid/infinite.
+        // Or if it's Cashback, ratio check is not applicable (or handled differently).
 
-        if (depositAmount > 0) {
-            const actualRatio = withdrawal.Amount / depositAmount;
-            if (actualRatio <= maxRatio) {
-                result.passedRules.push(`MAX_WITHDRAWAL_RATIO: ${actualRatio.toFixed(1)}x <= ${maxRatio}x`);
+        if (isBonusWithdrawal) {
+            result.passed = false;
+            result.failedRules.push('MAX_WITHDRAWAL_RATIO: Bonus/FreeSpin çekimi - Yatırım bulunamadı (Oran hesaplanamaz)');
+        } else if (withdrawalType === 'CASHBACK') {
+            // Cashback usually implies no recent huge deposit, but let's skip ratio check or check against cashback amount?
+            // For now, let's skip ratio check for Cashback as it has its own logic in turnover
+            result.passedRules.push('MAX_WITHDRAWAL_RATIO: Cashback çekimi - Oran kontrolü atlandı');
+        } else {
+            const maxRatio = parseFloat(rules.MAX_WITHDRAWAL_RATIO.value) || 30;
+            const depositAmount = snapshot?.turnover?.deposit?.amount || snapshot?.deposit?.amount || 0;
+
+            if (depositAmount > 0) {
+                const actualRatio = withdrawal.Amount / depositAmount;
+                if (actualRatio <= maxRatio) {
+                    result.passedRules.push(`MAX_WITHDRAWAL_RATIO: ${actualRatio.toFixed(1)}x <= ${maxRatio}x`);
+                } else {
+                    result.passed = false;
+                    result.failedRules.push(`MAX_WITHDRAWAL_RATIO: ₺${withdrawal.Amount} > ${maxRatio}x yatırım (₺${depositAmount})`);
+                }
             } else {
                 result.passed = false;
-                result.failedRules.push(`MAX_WITHDRAWAL_RATIO: ₺${withdrawal.Amount} > ${maxRatio}x yatırım (₺${depositAmount})`);
+                result.failedRules.push('MAX_WITHDRAWAL_RATIO: Yatırım bulunamadı');
             }
-        } else {
-            result.passed = false;
-            result.failedRules.push('MAX_WITHDRAWAL_RATIO: Yatırım bulunamadı');
         }
     }
 
     // 3. REQUIRE_DEPOSIT_TODAY - Check if deposit was made today
     if (rules.REQUIRE_DEPOSIT_TODAY?.enabled) {
-        const depositTime = snapshot?.turnover?.deposit?.time || snapshot?.deposit?.time;
-        if (isDepositToday(depositTime)) {
-            result.passedRules.push('REQUIRE_DEPOSIT_TODAY: Bugün yatırım var');
-        } else {
+        // If it's a Bonus withdrawal, do we allow it without deposit today?
+        // User said: "Bu üye deneme bonusuyla çekim gelmiş, yatırımı yok, neden onaylıyor".
+        // So for Bonus withdrawals, if there is NO Real Deposit, this rule should FAIL.
+
+        if (isBonusWithdrawal) {
             result.passed = false;
-            result.failedRules.push('REQUIRE_DEPOSIT_TODAY: Bugün yatırım yok');
+            result.failedRules.push('REQUIRE_DEPOSIT_TODAY: Bonus/FreeSpin çekimi - Bugün yatırım yok');
+        } else {
+            const depositTime = snapshot?.turnover?.deposit?.time || snapshot?.deposit?.time;
+            if (isDepositToday(depositTime)) {
+                result.passedRules.push('REQUIRE_DEPOSIT_TODAY: Bugün yatırım var');
+            } else {
+                result.passed = false;
+                result.failedRules.push('REQUIRE_DEPOSIT_TODAY: Bugün yatırım yok');
+            }
         }
     }
 
