@@ -142,8 +142,11 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                     <ArrowLeft size={20} /> Geri
                 </button>
                 <div className="player-info">
-                    <span className="player-name">{withdrawal.ClientLogin}</span>
-                    <span className="amount">{formatCurrency(withdrawal.Amount)}</span>
+                    <div className="player-main">
+                        <span className="player-name">{withdrawal.ClientLogin}</span>
+                        <span className="amount">{formatCurrency(withdrawal.Amount)}</span>
+                        <span className="payment-method">{withdrawal.PaymentSystemName || 'Bilinmiyor'}</span>
+                    </div>
                     <span className={`status-chip state-${withdrawal.State}`}>
                         {withdrawal.State === 0 ? 'YENİ' : withdrawal.State === 1 ? 'BEKLEMEDE' : withdrawal.State === 2 ? 'ÖDENDİ' : 'REDDEDİLDİ'}
                     </span>
@@ -231,8 +234,8 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                                 <div className="section-title">
                                     <Trophy size={16} /> Spor Kuponları
                                     {sportsBets.length > 0 && (
-                                        <span className={`section-total ${sportsBets.reduce((sum, b) => sum + ((b.win || 0) - (b.stake || 0)), 0) >= 0 ? 'positive' : 'negative'}`}>
-                                            Net: {formatCurrency(sportsBets.reduce((sum, b) => sum + ((b.win || 0) - (b.stake || 0)), 0))}
+                                        <span className={`section-total ${sportsBets.reduce((sum, b) => sum + ((b.winningAmount || 0) - (b.amount || 0)), 0) >= 0 ? 'positive' : 'negative'}`}>
+                                            Net: {formatCurrency(sportsBets.reduce((sum, b) => sum + ((b.winningAmount || 0) - (b.amount || 0)), 0))}
                                         </span>
                                     )}
                                 </div>
@@ -242,9 +245,11 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                                     <div className="mini-list">
                                         {sportsBets.slice(0, 4).map((bet, i) => (
                                             <div key={i} className="mini-item">
-                                                <span className="item-name">{bet.matchName || bet.game}</span>
-                                                <span className={`item-amount ${bet.win > 0 ? 'positive' : ''}`}>
-                                                    {formatCurrency(bet.win || bet.stake)}
+                                                <span className="item-name">
+                                                    {bet.selections?.[0]?.matchName || bet.type || `Bahis #${bet.id}`}
+                                                </span>
+                                                <span className={`item-amount ${(bet.winningAmount || 0) > 0 ? 'positive' : ''}`}>
+                                                    {formatCurrency(bet.amount)} → {formatCurrency(bet.winningAmount || 0)}
                                                 </span>
                                             </div>
                                         ))}
@@ -389,8 +394,10 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                     align-items: center;
                     gap: 16px;
                 }
+                .player-main { display: flex; flex-direction: column; align-items: center; }
                 .player-name { font-size: 18px; font-weight: 600; color: var(--text-primary); }
                 .amount { font-size: 20px; font-weight: 700; color: var(--status-approved); }
+                .payment-method { font-size: 11px; color: var(--text-muted); }
                 .status-chip {
                     padding: 4px 12px;
                     border-radius: 12px;
