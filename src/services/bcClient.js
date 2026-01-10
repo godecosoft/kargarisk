@@ -189,7 +189,12 @@ class BCClient {
     async payWithdrawalRequest(withdrawal) {
         logger.info('Approving withdrawal', { id: withdrawal.Id, amount: withdrawal.Amount });
 
-        const response = await this.post('/Client/PayWithdrawalRequests', withdrawal);
+        // BC expects array of withdrawal objects
+        const payload = [withdrawal];
+        logger.info('PayWithdrawalRequests payload:', JSON.stringify(payload).substring(0, 500));
+
+        const response = await this.post('/Client/PayWithdrawalRequests', payload);
+        logger.info('PayWithdrawalRequests response:', JSON.stringify(response));
 
         if (response.HasError) {
             throw new Error(response.AlertMessage || 'Withdrawal approval failed');
