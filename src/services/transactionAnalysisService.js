@@ -45,8 +45,8 @@ function analyzeWithdrawalType(transactions, withdrawalAmount, currentBalance) {
             }
         }
 
-        // FreeSpin (DocType 15 + Game contains "FreeSpin")
-        if (tx.DocumentTypeId === DOC_TYPES.BET_WIN && tx.Game?.toLowerCase().includes('freespin')) {
+        // FreeSpin (DocType 15 OR 3 + Game contains "FreeSpin")
+        if ((tx.DocumentTypeId === DOC_TYPES.BET_WIN || tx.DocumentTypeId === DOC_TYPES.DEPOSIT) && tx.Game?.toLowerCase().includes('freespin')) {
             const isFsWithdrawal = checkFreeSpinWithdrawal(tx);
             if (isFsWithdrawal) {
                 return {

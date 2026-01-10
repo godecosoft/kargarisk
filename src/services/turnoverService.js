@@ -49,6 +49,8 @@ async function getClientTransactions(clientId, days = 2) {
 function findLastDeposit(transactions) {
     const deposits = transactions
         .filter(t => t.DocumentTypeId === 3)
+        // Exclude FreeSpin/Bonus items that might be tagged as DocumentType 3
+        .filter(t => !t.Game?.toLowerCase().includes('freespin') && !t.Game?.toLowerCase().includes('bonus'))
         .sort((a, b) => new Date(b.CreatedLocal) - new Date(a.CreatedLocal));
 
     return deposits[0] || null;
