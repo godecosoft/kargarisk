@@ -136,11 +136,24 @@ function checkBonusWithdrawal(tx) {
 
 /**
  * Filter out bet cashouts from transactions for turnover calculation
+ * Logic: Find all BetIds from Cashout transactions (Type 14) and exclude the original Bet (Type 10) and the Cashout itself from turnover
  * @param {Array} transactions - All transactions
- * @returns {Array} Transactions without cashouts
+ * @returns {Array} Transactions with cashouted bets removed
  */
 function excludeBetCashouts(transactions) {
-    return transactions.filter(tx => tx.DocumentTypeId !== DOC_TYPES.BET_CASHOUT);
+    // 1. Identify BetIds that were cashed out (DocType 14)
+    const cashoutBetIds = new Set(
+        transactions
+            .filter(tx => tx.DocumentTypeId === DOC_TYPES.BET_CASHOUT && tx.BetId)
+            .map(tx => tx.BetId)
+    );
+
+    if (cashoutBetIds.size === 0) return transactions;
+
+    logger.info(`Found ${cashoutBetIds.size} cashout bets to exclude`, { ids: [...cashoutBetIds] });
+
+    // 2. Filter out any transaction (Bet or Cashout) with these BetIds
+    return transactions.filter(tx => !tx.BetId || !cashoutBetIds.has(tx.BetId));
 }
 
 /**
