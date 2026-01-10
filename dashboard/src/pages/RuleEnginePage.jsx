@@ -22,6 +22,8 @@ function RuleEnginePage() {
                 fetchAutoApprovalRules()
             ]);
 
+            console.log('Loaded auto-approval rules:', autoApprovalRules);
+
             if (generalRules.success && generalRules.rules) {
                 setRules(prev => ({
                     ...prev,
@@ -30,7 +32,10 @@ function RuleEnginePage() {
             }
 
             if (autoApprovalRules.success && autoApprovalRules.rules) {
+                console.log('Setting autoRules:', autoApprovalRules.rules);
                 setAutoRules(autoApprovalRules.rules);
+            } else {
+                console.error('Auto-approval rules failed:', autoApprovalRules);
             }
         } catch (error) {
             console.error('Failed to load rules:', error);

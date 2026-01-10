@@ -12,16 +12,21 @@ const logger = require('../utils/logger');
  */
 async function getRules() {
     const pool = db.getPool();
-    if (!pool) return {};
+    if (!pool) {
+        logger.warn('[AutoApproval] No database pool available');
+        return {};
+    }
 
     try {
         const [rows] = await pool.query('SELECT * FROM auto_approval_rules');
+        logger.info(`[AutoApproval] Loaded ${rows.length} rules from DB`);
+
         const rules = {};
         for (const row of rows) {
             rules[row.rule_key] = {
                 name: row.rule_name,
                 value: row.rule_value,
-                enabled: row.is_enabled === 1,
+                enabled: Boolean(row.is_enabled), // Convert to boolean properly
                 description: row.description
             };
         }
