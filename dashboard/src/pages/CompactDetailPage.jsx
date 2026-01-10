@@ -209,11 +209,11 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                                             <span className="time-text">{formatTime(turnover.deposit.time)}</span>
                                         </div>
                                     )}
-                                    <div className="stat-row">
+                                    <div className="stat-row casino-row">
                                         <span>Casino:</span>
                                         <span>{formatCurrency(turnover?.turnover?.casino?.amount)} ({turnover?.turnover?.casino?.percentage || 0}%)</span>
                                     </div>
-                                    <div className="stat-row">
+                                    <div className="stat-row sports-row">
                                         <span>Spor:</span>
                                         <span>{formatCurrency(turnover?.turnover?.sports?.amount)} ({turnover?.turnover?.sports?.percentage || 0}%)</span>
                                     </div>
@@ -514,6 +514,8 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                 .stat-row.highlight { font-weight: 600; color: var(--text-primary); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-subtle); }
                 .stat-row .complete { color: var(--status-approved); }
                 .stat-row .incomplete { color: var(--status-rejected); }
+                .stat-row.casino-row span { color: #22c55e; }
+                .stat-row.sports-row span { color: #3b82f6; }
 
                 .middle-card, .right-card {
                     display: flex;
