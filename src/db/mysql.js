@@ -205,12 +205,24 @@ async function runMigrations() {
         for (const [key, name, value, enabled, desc] of rules) {
             await pool.query(`
                 INSERT INTO auto_approval_rules (rule_key, rule_name, rule_value, is_enabled, description) 
-                VALUES (?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE 
-                    rule_name = VALUES(rule_name),
-                    description = VALUES(description)
             `, [key, name, value, enabled, desc]);
         }
+
+        // Bonus Rules Table (Dynamic Bonus Management)
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS bonus_rules (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                match_keyword VARCHAR(50) NOT NULL UNIQUE,
+                is_active BOOLEAN DEFAULT TRUE,
+                auto_approval_enabled BOOLEAN DEFAULT FALSE,
+                max_amount DECIMAL(12,2) DEFAULT 0,
+                ignore_deposit_rule BOOLEAN DEFAULT FALSE,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_keyword (match_keyword)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
 
         console.log('[DB] Migrations completed - all tables ready including auto_approvals');
     } catch (error) {

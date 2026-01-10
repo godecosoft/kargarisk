@@ -7,6 +7,7 @@ import CompactDetailPage from './pages/CompactDetailPage';
 import ReportsPage from './pages/ReportsPage';
 import RuleEnginePage from './pages/RuleEnginePage';
 import AutoApprovalHistoryPage from './pages/AutoApprovalHistoryPage';
+import BonusRulesPage from './pages/BonusRulesPage';
 import './index.css';
 
 function App() {
@@ -38,6 +39,8 @@ function App() {
         return <ReportsPage />;
       case 'rules':
         return <RuleEnginePage />;
+      case 'bonus-rules':
+        return <BonusRulesPage />;
       case 'auto-history':
         return <AutoApprovalHistoryPage />;
       default:

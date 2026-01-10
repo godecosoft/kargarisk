@@ -527,6 +527,56 @@ app.get('/api/auto-approval/history', async (req, res) => {
     }
 });
 
+// --- Bonus Rules Endpoints ---
+
+// GET /api/bonus-rules - Get all rules
+app.get('/api/bonus-rules', async (req, res) => {
+    try {
+        const bonusRulesService = require('./services/bonusRulesService');
+        const rules = await bonusRulesService.getAllRules();
+        res.json({ success: true, data: rules });
+    } catch (error) {
+        logger.error('API Error: Get bonus rules', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// POST /api/bonus-rules - Add new rule
+app.post('/api/bonus-rules', async (req, res) => {
+    try {
+        const bonusRulesService = require('./services/bonusRulesService');
+        const id = await bonusRulesService.addRule(req.body);
+        res.json({ success: true, id });
+    } catch (error) {
+        logger.error('API Error: Add bonus rule', { error: error.message });
+        res.status(500).json({ success: false, error: 'Kural eklenemedi: ' + error.message });
+    }
+});
+
+// PUT /api/bonus-rules/:id - Update rule
+app.put('/api/bonus-rules/:id', async (req, res) => {
+    try {
+        const bonusRulesService = require('./services/bonusRulesService');
+        await bonusRulesService.updateRule(req.params.id, req.body);
+        res.json({ success: true });
+    } catch (error) {
+        logger.error('API Error: Update bonus rule', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// DELETE /api/bonus-rules/:id - Delete rule
+app.delete('/api/bonus-rules/:id', async (req, res) => {
+    try {
+        const bonusRulesService = require('./services/bonusRulesService');
+        await bonusRulesService.deleteRule(req.params.id);
+        res.json({ success: true });
+    } catch (error) {
+        logger.error('API Error: Delete bonus rule', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // SPA fallback - serve index.html for non-API routes
 app.use((req, res, next) => {
     // Skip API routes

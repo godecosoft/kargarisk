@@ -165,4 +165,44 @@ export async function fetchAutoApprovalHistory(limit = 50) {
     const response = await fetch(`${API_BASE}/auto-approval/history?limit=${limit}`);
     if (!response.ok) throw new Error('Failed to fetch approval history');
     return response.json();
+}// ============================================
+// BONUS RULES API (Dynamic Bonus Management)
+// ============================================
+
+export async function fetchBonusRules() {
+    const response = await fetch(`${API_BASE}/bonus-rules`);
+    if (!response.ok) throw new Error('Bonus kuralları yüklenemedi');
+    const result = await response.json();
+    return result.data;
+}
+
+export async function addBonusRule(ruleData) {
+    const response = await fetch(`${API_BASE}/bonus-rules`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ruleData)
+    });
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Kural eklenemedi');
+    }
+    return response.json();
+}
+
+export async function updateBonusRule(id, updates) {
+    const response = await fetch(`${API_BASE}/bonus-rules/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+    });
+    if (!response.ok) throw new Error('Kural güncellenemedi');
+    return response.json();
+}
+
+export async function deleteBonusRule(id) {
+    const response = await fetch(`${API_BASE}/bonus-rules/${id}`, {
+        method: 'DELETE'
+    });
+    if (!response.ok) throw new Error('Kural silinemedi');
+    return response.json();
 }

@@ -6,6 +6,7 @@
 const db = require('../db/mysql');
 const bcClient = require('./bcClient');
 const logger = require('../utils/logger');
+const bonusRulesService = require('./bonusRulesService');
 
 /**
  * Get all auto-approval rules from DB
@@ -93,14 +94,47 @@ function hasForbiddenGames(casinoGames, forbiddenPatterns) {
  * @param {Object} rules - Rules from DB
  * @returns {Object} { passed: boolean, failedRules: string[], passedRules: string[] }
  */
-function evaluateRules(withdrawal, snapshot, rules) {
+/**
+ * Evaluate all rules for a withdrawal
+ * @param {Object} withdrawal - BC withdrawal object
+ * @param {Object} snapshot - Snapshot data from DB
+ * @param {Object} rules - Rules from DB
+ * @param {Object|null} bonusRule - Matched bonus rule (if any)
+ * @returns {Object} { passed: boolean, failedRules: string[], passedRules: string[] }
+ */
+function evaluateRules(withdrawal, snapshot, rules, bonusRule = null) {
     const result = {
         passed: true,
         failedRules: [],
         passedRules: []
     };
 
-    // 1. MAX_AMOUNT - Check withdrawal amount
+    // Check for fake deposit (Bonus/FreeSpin turnover reference)
+    const withdrawalType = snapshot?.turnover?.withdrawalType?.type;
+    const isBonusWithdrawal = withdrawalType === 'BONUS' || withdrawalType === 'FREESPIN';
+
+    // SPECIAL HANDLING FOR BONUS RULES
+    if (bonusRule) {
+        result.passedRules.push(`BONUS_RULE_MATCH: ${bonusRule.name}`);
+
+        // 1. Check if auto-approval is enabled for this specific bonus
+        if (!bonusRule.auto_approval_enabled) {
+            result.passed = false;
+            result.failedRules.push(`BONUS_RULE: Bu bonus (${bonusRule.name}) için otomatik onay KAPALI`);
+        }
+
+        // 2. Check Max Amount from Bonus Rule
+        if (bonusRule.max_amount > 0 && withdrawal.Amount > bonusRule.max_amount) {
+            result.passed = false;
+            result.failedRules.push(`BONUS_LIMIT: ₺${withdrawal.Amount} > Bonus Limiti ₺${bonusRule.max_amount}`);
+        }
+    } else if (isBonusWithdrawal) {
+        // If it's a bonus withdrawal but NO rule matched -> REJECT
+        result.passed = false;
+        result.failedRules.push('BONUS_RULE: Tanımlı bonus kuralı bulunamadı (Default Reject)');
+    }
+
+    // 1. MAX_AMOUNT - Check withdrawal amount (Global)
     if (rules.MAX_AMOUNT?.enabled) {
         const maxAmount = parseFloat(rules.MAX_AMOUNT.value) || 5000;
         if (withdrawal.Amount <= maxAmount) {
@@ -111,21 +145,18 @@ function evaluateRules(withdrawal, snapshot, rules) {
         }
     }
 
-    // Check for fake deposit (Bonus/FreeSpin turnover reference)
-    const withdrawalType = snapshot?.turnover?.withdrawalType?.type;
-    const isBonusWithdrawal = withdrawalType === 'BONUS' || withdrawalType === 'FREESPIN';
-
     // 2. MAX_WITHDRAWAL_RATIO - Check if withdrawal > Nx deposit amount
     if (rules.MAX_WITHDRAWAL_RATIO?.enabled) {
-        // If it's a Bonus/FreeSpin withdrawal, there is NO deposit, so ratio is invalid/infinite.
-        // Or if it's Cashback, ratio check is not applicable (or handled differently).
+        const ignoreDeposit = bonusRule?.ignore_deposit_rule;
 
         if (isBonusWithdrawal) {
-            result.passed = false;
-            result.failedRules.push('MAX_WITHDRAWAL_RATIO: Bonus/FreeSpin çekimi - Yatırım bulunamadı (Oran hesaplanamaz)');
+            if (!ignoreDeposit) {
+                result.passed = false;
+                result.failedRules.push('MAX_WITHDRAWAL_RATIO: Bonus/FreeSpin çekimi - Yatırım bulunamadı (Oran hesaplanamaz)');
+            } else {
+                result.passedRules.push('MAX_WITHDRAWAL_RATIO: Bonus kuralı nedeniyle yoksayıldı');
+            }
         } else if (withdrawalType === 'CASHBACK') {
-            // Cashback usually implies no recent huge deposit, but let's skip ratio check or check against cashback amount?
-            // For now, let's skip ratio check for Cashback as it has its own logic in turnover
             result.passedRules.push('MAX_WITHDRAWAL_RATIO: Cashback çekimi - Oran kontrolü atlandı');
         } else {
             const maxRatio = parseFloat(rules.MAX_WITHDRAWAL_RATIO.value) || 30;
@@ -148,20 +179,17 @@ function evaluateRules(withdrawal, snapshot, rules) {
 
     // 3. REQUIRE_DEPOSIT_TODAY - Check if deposit was made today
     if (rules.REQUIRE_DEPOSIT_TODAY?.enabled) {
-        // If it's a Bonus withdrawal, do we allow it without deposit today?
-        // User said: "Bu üye deneme bonusuyla çekim gelmiş, yatırımı yok, neden onaylıyor".
-        // So for Bonus withdrawals, if there is NO Real Deposit, this rule should FAIL.
+        const ignoreDeposit = bonusRule?.ignore_deposit_rule;
+        const depositTime = snapshot?.turnover?.deposit?.time || snapshot?.deposit?.time;
 
-        if (isBonusWithdrawal) {
-            result.passed = false;
-            result.failedRules.push('REQUIRE_DEPOSIT_TODAY: Bonus/FreeSpin çekimi - Bugün yatırım yok');
+        if (isDepositToday(depositTime)) {
+            result.passedRules.push('REQUIRE_DEPOSIT_TODAY: Bugün yatırım mevcut');
         } else {
-            const depositTime = snapshot?.turnover?.deposit?.time || snapshot?.deposit?.time;
-            if (isDepositToday(depositTime)) {
-                result.passedRules.push('REQUIRE_DEPOSIT_TODAY: Bugün yatırım var');
+            if (isBonusWithdrawal && ignoreDeposit) {
+                result.passedRules.push('REQUIRE_DEPOSIT_TODAY: Bonus kuralı nedeniyle yoksayıldı');
             } else {
                 result.passed = false;
-                result.failedRules.push('REQUIRE_DEPOSIT_TODAY: Bugün yatırım yok');
+                result.failedRules.push('REQUIRE_DEPOSIT_TODAY: Bugün yatırım bulunamadı');
             }
         }
     }
@@ -309,8 +337,26 @@ async function processAutoApproval(withdrawal, snapshot) {
             };
         }
 
-        // Evaluate rules
-        const ruleResult = evaluateRules(withdrawal, snapshot, rules);
+        // Check for Bonus Rule Match (Dynamic Bonus Management)
+        let matchedBonusRule = null;
+        const withdrawalType = snapshot?.turnover?.withdrawalType?.type;
+        const isBonusOrFreeSpin = withdrawalType === 'BONUS' || withdrawalType === 'FREESPIN';
+
+        if (isBonusOrFreeSpin) {
+            // Use the "fake" deposit object which contains bonus details (Game, PaymentSystemName, Notes)
+            // turnoverService logic puts this info in snapshot.turnover.deposit for bonuses.
+            const bonusTransaction = snapshot?.turnover?.deposit || {};
+            matchedBonusRule = await bonusRulesService.findMatchingRule(bonusTransaction);
+
+            if (matchedBonusRule) {
+                logger.info(`[AutoApproval] Matched Bonus Rule: ${matchedBonusRule.name} (ID: ${matchedBonusRule.id}) for withdrawal ${withdrawal.Id}`);
+            } else {
+                logger.info(`[AutoApproval] Bonus/FreeSpin withdrawal but NO matching rule found for ${withdrawal.Id}`);
+            }
+        }
+
+        // Evaluate rules with bonus context
+        const ruleResult = evaluateRules(withdrawal, snapshot, rules, matchedBonusRule);
 
         if (!ruleResult.passed) {
             logger.info(`[AutoApproval] Withdrawal ${withdrawal.Id} failed rules:`, ruleResult.failedRules);
