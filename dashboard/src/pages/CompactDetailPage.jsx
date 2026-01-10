@@ -172,7 +172,12 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                     </div>
                     <div className="kpi-stat">
                         <span className="kpi-label">Son Çekim</span>
-                        <span className="kpi-value">{formatCurrency(clientKpi.lastWithdrawalAmount)}</span>
+                        <span className="kpi-value">
+                            {formatCurrency(clientKpi.lastWithdrawalAmount)}
+                            {clientKpi.lastWithdrawalTime && (
+                                <small> • {formatTime(clientKpi.lastWithdrawalTime)}</small>
+                            )}
+                        </span>
                     </div>
                     <div className="kpi-stat">
                         <span className="kpi-label">Spor Bahis</span>
