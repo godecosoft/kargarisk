@@ -248,11 +248,15 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                                     <div className="ip-list">
                                         {ipAnalysis.analysis.slice(0, 3).map((ip, i) => (
                                             <div key={i} className={`ip-item ${ip.otherAccounts?.length > 0 ? 'warning' : ''}`}>
-                                                <span className="ip-address">{ip.ip}</span>
-                                                <span className="ip-info">
-                                                    {ip.loginCount} giriş
-                                                    {ip.otherAccounts?.length > 0 && ` • ${ip.otherAccounts.length} hesap`}
-                                                </span>
+                                                <div className="ip-main">
+                                                    <span className="ip-address">{ip.ip}</span>
+                                                    <span className="ip-info">{ip.loginCount} giriş</span>
+                                                </div>
+                                                {ip.otherAccounts?.length > 0 && (
+                                                    <div className="other-accounts">
+                                                        ⚠️ Diğer hesaplar: {ip.otherAccounts.map(acc => acc.Login || acc.login).join(', ')}
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -484,15 +488,23 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                 .ip-list { display: flex; flex-direction: column; gap: 4px; }
                 .ip-item {
                     display: flex;
-                    justify-content: space-between;
+                    flex-direction: column;
+                    gap: 4px;
                     padding: 6px 8px;
                     background: var(--bg-tertiary);
                     border-radius: var(--radius-sm);
                     font-size: 12px;
                 }
                 .ip-item.warning { background: var(--status-rejected-bg); border: 1px solid var(--status-rejected); }
+                .ip-main { display: flex; justify-content: space-between; }
                 .ip-address { font-family: monospace; color: var(--text-primary); }
                 .ip-info { color: var(--text-muted); }
+                .other-accounts { 
+                    font-size: 11px; 
+                    color: var(--status-rejected); 
+                    font-weight: 500;
+                    word-break: break-word;
+                }
 
                 .footer-bar {
                     display: flex;
