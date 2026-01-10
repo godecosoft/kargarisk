@@ -205,8 +205,17 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                                 <CircularProgress percentage={totalPercentage} />
                                 <div className="turnover-stats">
                                     <div className="stat-row">
-                                        <span>Yatırım:</span>
-                                        <span>{formatCurrency(turnover?.deposit?.amount)}</span>
+                                        <span>
+                                            {turnover?.withdrawalType?.type === 'FREESPIN' ? 'FreeSpin Tutarı:' :
+                                                turnover?.withdrawalType?.type === 'BONUS' ? 'Bonus Tutarı:' :
+                                                    turnover?.withdrawalType?.type === 'CASHBACK' ? 'Cashback:' :
+                                                        'Yatırım:'}
+                                        </span>
+                                        <span>
+                                            {formatCurrency(turnover?.deposit?.amount)}
+                                            {turnover?.withdrawalType?.type === 'FREESPIN' && ' 🎰'}
+                                            {turnover?.withdrawalType?.type === 'BONUS' && ' 🎁'}
+                                        </span>
                                     </div>
                                     {turnover?.deposit?.time && (
                                         <div className="stat-row time-row">
