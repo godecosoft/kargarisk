@@ -49,9 +49,29 @@ async function getClientTransactions(clientId, days = 2) {
 function findLastDeposit(transactions) {
     const deposits = transactions
         .filter(t => t.DocumentTypeId === 3)
-        // Exclude FreeSpin/Bonus items that might be tagged as DocumentType 3
-        .filter(t => !t.Game?.toLowerCase().includes('freespin') && !t.Game?.toLowerCase().includes('bonus'))
+        // STRICT FILTER: Exclude anything that mentions FreeSpin or Bonus in Game, PaymentSystem, or Notes
+        .filter(t => {
+            const game = t.Game?.toLowerCase() || '';
+            const payment = t.PaymentSystemName?.toLowerCase() || '';
+            const notes = t.Notes?.toLowerCase() || '';
+
+            // Check for FreeSpin or Bonus keywords
+            if (game.includes('freespin') || game.includes('bonus') || game.includes('deneme')) return false;
+            if (payment.includes('freespin') || payment.includes('bonus') || payment.includes('deneme')) return false;
+            if (notes.includes('freespin') || notes.includes('bonus') || notes.includes('deneme')) return false;
+
+            return true;
+        })
         .sort((a, b) => new Date(b.CreatedLocal) - new Date(a.CreatedLocal));
+
+    if (deposits.length > 0) {
+        logger.info('Found last deposit', {
+            amount: deposits[0].Amount,
+            time: deposits[0].CreatedLocal,
+            game: deposits[0].Game,
+            payment: deposits[0].PaymentSystemName
+        });
+    }
 
     return deposits[0] || null;
 }
