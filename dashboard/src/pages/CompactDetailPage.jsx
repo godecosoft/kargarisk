@@ -194,7 +194,14 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                         <div className="detail-card middle-card">
                             {/* Spor Kuponları */}
                             <div className="sub-section">
-                                <div className="section-title"><Trophy size={16} /> Spor Kuponları</div>
+                                <div className="section-title">
+                                    <Trophy size={16} /> Spor Kuponları
+                                    {sportsBets.length > 0 && (
+                                        <span className={`section-total ${sportsBets.reduce((sum, b) => sum + ((b.win || 0) - (b.stake || 0)), 0) >= 0 ? 'positive' : 'negative'}`}>
+                                            Net: {formatCurrency(sportsBets.reduce((sum, b) => sum + ((b.win || 0) - (b.stake || 0)), 0))}
+                                        </span>
+                                    )}
+                                </div>
                                 {sportsBets.length === 0 ? (
                                     <div className="empty-message">Kupon yok</div>
                                 ) : (
@@ -214,7 +221,14 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
 
                             {/* Casino Top 5 */}
                             <div className="sub-section">
-                                <div className="section-title"><Gamepad2 size={16} /> Casino Top 5</div>
+                                <div className="section-title">
+                                    <Gamepad2 size={16} /> Casino Top 5
+                                    {casinoGames.length > 0 && (
+                                        <span className={`section-total ${casinoGames.reduce((sum, g) => sum + (g.winAmount - g.betAmount), 0) >= 0 ? 'positive' : 'negative'}`}>
+                                            Net: {formatCurrency(casinoGames.reduce((sum, g) => sum + (g.winAmount - g.betAmount), 0))}
+                                        </span>
+                                    )}
+                                </div>
                                 {casinoGames.length === 0 ? (
                                     <div className="empty-message">Casino oyunu yok</div>
                                 ) : (
@@ -459,6 +473,15 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                     color: var(--text-secondary);
                     margin-bottom: 8px;
                 }
+                .section-total {
+                    margin-left: auto;
+                    font-size: 12px;
+                    font-weight: 700;
+                    padding: 2px 8px;
+                    border-radius: 8px;
+                }
+                .section-total.positive { background: var(--status-approved-bg); color: var(--status-approved); }
+                .section-total.negative { background: var(--status-rejected-bg); color: var(--status-rejected); }
                 .warning-icon { color: var(--status-rejected); }
 
                 .mini-list {
