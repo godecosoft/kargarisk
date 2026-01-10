@@ -183,6 +183,7 @@ async function syncStatuses(withdrawals) {
 
 /**
  * Get decisions for multiple withdrawals in batch
+ * Processes SEQUENTIALLY with rate limit handling
  * Returns from DB if exists, creates snapshot if new
  * 
  * @param {Array} withdrawals - Array of BC withdrawal objects
@@ -210,8 +211,13 @@ async function getDecisionsBatch(withdrawals) {
 
         const existingMap = new Map(existingRows.map(r => [r.id, r]));
 
-        // Process each withdrawal
-        for (const w of withdrawals) {
+        // Process each withdrawal SEQUENTIALLY
+        // Sort by request time (oldest first)
+        const sortedWithdrawals = [...withdrawals].sort(
+            (a, b) => new Date(a.RequestTimeLocal) - new Date(b.RequestTimeLocal)
+        );
+
+        for (const w of sortedWithdrawals) {
             const existing = existingMap.get(w.Id);
 
             if (existing) {
@@ -223,17 +229,30 @@ async function getDecisionsBatch(withdrawals) {
                     fromCache: true,
                     checkedAt: existing.checked_at
                 };
-            } else if (w.State === 0) {
-                // New withdrawal - create snapshot
-                const snapshot = await createSnapshot(w);
+                continue;
+            }
+
+            // Only create snapshot for "New" state items
+            if (w.State !== 0) continue;
+
+            // Create snapshot with retry logic for rate limits
+            logger.info(`[SnapshotService] Processing withdrawal ${w.Id} (${w.ClientLogin})`);
+
+            const snapshot = await createSnapshotWithRetry(w, 3);
+
+            if (snapshot.success) {
                 results[w.Id] = {
                     decision: snapshot.decision,
                     reason: snapshot.reason,
                     withdrawalType: snapshot.withdrawalType,
                     fromCache: false
                 };
+            } else {
+                logger.warn(`[SnapshotService] Failed to create snapshot for ${w.Id}: ${snapshot.error}`);
             }
-            // Non-new items without snapshot are skipped
+
+            // Small delay between API calls to avoid rate limiting
+            await sleep(500);
         }
 
         return results;
@@ -241,6 +260,62 @@ async function getDecisionsBatch(withdrawals) {
         logger.error('[SnapshotService] getDecisionsBatch error:', error.message);
         return results;
     }
+}
+
+/**
+ * Create snapshot with retry logic for rate limits
+ * @param {Object} withdrawal - BC withdrawal object
+ * @param {number} maxRetries - Maximum retry attempts
+ * @returns {Object} Snapshot result
+ */
+async function createSnapshotWithRetry(withdrawal, maxRetries = 3) {
+    const tokenService = require('./tokenService');
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const result = await createSnapshot(withdrawal);
+            return result;
+        } catch (error) {
+            const isRateLimit = error.message?.includes('rate') ||
+                error.message?.includes('429') ||
+                error.message?.includes('Too Many') ||
+                error.response?.status === 429;
+
+            const isAuthError = error.response?.status === 401 ||
+                error.response?.status === 403;
+
+            if (isRateLimit || isAuthError) {
+                logger.warn(`[SnapshotService] Rate limit or auth error on attempt ${attempt}/${maxRetries}`);
+
+                if (isAuthError) {
+                    // Refresh token and retry
+                    logger.info('[SnapshotService] Refreshing token...');
+                    await tokenService.refreshToken();
+                }
+
+                if (attempt < maxRetries) {
+                    // Wait before retry (exponential backoff)
+                    const waitTime = Math.min(5000 * attempt, 15000);
+                    logger.info(`[SnapshotService] Waiting ${waitTime}ms before retry...`);
+                    await sleep(waitTime);
+                    continue;
+                }
+            }
+
+            // Non-retryable error or max retries reached
+            logger.error(`[SnapshotService] createSnapshotWithRetry failed: ${error.message}`);
+            return { success: false, error: error.message };
+        }
+    }
+
+    return { success: false, error: 'Max retries reached' };
+}
+
+/**
+ * Sleep helper
+ */
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // Helper: Fetch sports data
