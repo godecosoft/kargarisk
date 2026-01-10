@@ -166,6 +166,12 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                                         <span>Yatırım:</span>
                                         <span>{formatCurrency(turnover?.deposit?.amount)}</span>
                                     </div>
+                                    {turnover?.deposit?.time && (
+                                        <div className="stat-row time-row">
+                                            <span></span>
+                                            <span className="time-text">{formatTime(turnover.deposit.time)}</span>
+                                        </div>
+                                    )}
                                     <div className="stat-row">
                                         <span>Casino:</span>
                                         <span>{formatCurrency(turnover?.turnover?.casino?.amount)} ({turnover?.turnover?.casino?.percentage || 0}%)</span>
@@ -261,9 +267,12 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                                 ) : (
                                     <div className="mini-list">
                                         {bonuses.slice(0, 3).map((b, i) => (
-                                            <div key={i} className="mini-item">
-                                                <span className="item-name">{b.name}</span>
-                                                <span className="item-amount">{formatCurrency(b.amount)}</span>
+                                            <div key={i} className="mini-item with-time">
+                                                <div className="item-main">
+                                                    <span className="item-name">{b.name}</span>
+                                                    <span className="item-amount">{formatCurrency(b.amount)}</span>
+                                                </div>
+                                                {b.createdAt && <span className="item-time">{formatTime(b.createdAt)}</span>}
                                             </div>
                                         ))}
                                     </div>
@@ -279,7 +288,8 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                             <div className="tx-chips">
                                 {bonusTx.map((tx, i) => (
                                     <div key={i} className={`tx-chip ${tx.type.toLowerCase()}`}>
-                                        {tx.type === 'FREESPIN' ? '🎰' : '🎁'} {formatCurrency(tx.amount)}
+                                        <span>{tx.type === 'FREESPIN' ? '🎰' : '🎁'} {formatCurrency(tx.amount)}</span>
+                                        {tx.time && <span className="tx-time">{formatTime(tx.time)}</span>}
                                     </div>
                                 ))}
                             </div>
@@ -503,6 +513,15 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                 }
                 .tx-chip.freespin { background: var(--status-processing-bg); color: var(--status-processing); }
                 .tx-chip.bonus { background: var(--status-approved-bg); color: var(--status-approved); }
+                .tx-chip { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+                .tx-time { font-size: 10px; opacity: 0.7; }
+
+                .time-row { margin-top: -4px; }
+                .time-text { font-size: 11px; color: var(--text-muted); }
+
+                .mini-item.with-time { flex-direction: column; gap: 2px; }
+                .item-main { display: flex; justify-content: space-between; width: 100%; }
+                .item-time { font-size: 10px; color: var(--text-muted); }
 
                 .loading-indicator {
                     flex: 1;
