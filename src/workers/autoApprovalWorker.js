@@ -45,31 +45,27 @@ class AutoApprovalWorker {
 
         try {
             // Fetch only NEW withdrawals (State=0)
-            const payload = {
-                ClientIds: [],
-                DocumentTypeIds: [1], // Withdrawal
-                States: [0], // New (Wait)
-                StartTimeLocal: null,
-                EndTimeLocal: null,
-                MaxRows: 50, // Limit per batch
-                SkeepRows: 0,
-                // Add any other necessary filters
+            // Use getWithdrawalRequests with filters
+            // Look back 3 days to catch any missed ones/system downtime
+            const fromDate = new Date();
+            fromDate.setDate(fromDate.getDate() - 3);
+
+            const formatDate = (date) => {
+                const dd = String(date.getDate()).padStart(2, '0');
+                const mm = String(date.getMonth() + 1).padStart(2, '0');
+                const yy = String(date.getFullYear()).slice(-2);
+                return `${dd}-${mm}-${yy} - 00:00:00`;
             };
 
-            // Using existing method which supports payload override or custom logic?
-            // bcClient.getClientWithdrawalRequests uses specific payload structure.
-            // Let's call it with default args which fetches recent ones, but we need specifically STATE=0
+            const filters = {
+                stateList: [0], // Only New
+                fromDate: formatDate(fromDate) // Override default which is just today
+            };
 
-            // We can reuse getClientWithdrawalRequests but it might fetch Pending (2) as well.
-            // Auto-approval usually applies to NEW (0) requests before they are manually processed.
-            // If we process Pending (2), we might double-approve? 
-            // BC 'PayWithdrawalRequests' creates a payout. If it's already Pending, it might be waiting for provider?
-            // Usually 'New' -> 'Approve' -> 'Payout'.
+            const data = await bcClient.getWithdrawalRequests(filters);
 
-            // Let's use getClientWithdrawalRequests(1, 50) and filter for State === 0?
-            const withdrawals = await bcClient.getClientWithdrawalRequests(1, 50);
-
-            const newWithdrawals = withdrawals.filter(w => w.State === 0);
+            // Response has ClientRequests array
+            const newWithdrawals = data.ClientRequests || [];
 
             if (newWithdrawals.length > 0) {
                 logger.info(`[AutoApprovalWorker] Found ${newWithdrawals.length} new withdrawals to process`);
