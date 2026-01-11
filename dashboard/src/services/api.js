@@ -131,6 +131,12 @@ export async function fetchClientKpi(clientId) {
     return response.json();
 }
 
+export async function fetchClientDetails(clientId) {
+    const response = await fetch(`${API_BASE}/client/${clientId}/details`);
+    if (!response.ok) throw new Error('Failed to fetch client details');
+    return response.json();
+}
+
 // ============================================
 // AUTO-APPROVAL API
 // ============================================

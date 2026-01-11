@@ -127,7 +127,39 @@ function evaluateRules(withdrawal, snapshot, rules, bonusRule = null) {
         // 2. Check Max Amount from Bonus Rule
         if (bonusRule.max_amount > 0 && withdrawal.Amount > bonusRule.max_amount) {
             result.passed = false;
-            result.failedRules.push(`BONUS_LIMIT: ₺${withdrawal.Amount} > Bonus Limiti ₺${bonusRule.max_amount}`);
+            result.failedRules.push(`BONUS_LIMIT: ₺${withdrawal.Amount} > Max ₺${bonusRule.max_amount}`);
+        }
+
+        // 3. Check Fixed Withdrawal Amount
+        if (bonusRule.fixed_withdrawal_amount > 0 && withdrawal.Amount > bonusRule.fixed_withdrawal_amount) {
+            result.passed = false;
+            result.failedRules.push(`BONUS_FIXED: ₺${withdrawal.Amount} > Sabit Limit ₺${bonusRule.fixed_withdrawal_amount}`);
+        }
+
+        // 4. Check Min Balance Limit (balance + withdrawal must be >= limit)
+        if (bonusRule.min_balance_limit > 0) {
+            // Note: We need clientDetails for this - will be checked at approval time
+            // For now, add a marker that this check is required
+            result.passedRules.push(`MIN_BALANCE_CHECK: Onay sırasında ₺${bonusRule.min_balance_limit} bakiye kontrolü yapılacak`);
+        }
+
+        // 5. Check max_remaining_balance (snapshot'tan mevcut bakiye kontrolü)
+        if (bonusRule.max_remaining_balance !== undefined && bonusRule.max_remaining_balance >= 0) {
+            // This will be checked at approval time with fresh balance
+            result.passedRules.push(`MAX_REMAINING_CHECK: Onay sırasında max ₺${bonusRule.max_remaining_balance} kalan bakiye kontrolü yapılacak`);
+        }
+
+        // 6. Check require_deposit_id (bonus notlarında yatırım ID olmalı)
+        if (bonusRule.require_deposit_id) {
+            const bonusNotes = snapshot?.turnover?.deposit?.Notes || snapshot?.turnover?.deposit?.Warning || '';
+            // Look for deposit ID pattern (typically a long number)
+            const hasDepositId = /\d{10,}/.test(bonusNotes);
+            if (hasDepositId) {
+                result.passedRules.push('DEPOSIT_ID: Bonus notlarında yatırım ID bulundu');
+            } else {
+                result.passed = false;
+                result.failedRules.push('DEPOSIT_ID: Bonus notlarında yatırım ID bulunamadı');
+            }
         }
     } else if (isBonusWithdrawal) {
         // If it's a bonus withdrawal but NO rule matched -> REJECT
@@ -390,6 +422,66 @@ async function processAutoApproval(withdrawal, snapshot) {
 
         // All rules passed - call BC API to approve
         logger.info(`[AutoApproval] Approving withdrawal ${withdrawal.Id}...`);
+
+        // STEP: Handle balance-based bonus rules BEFORE approval
+        if (matchedBonusRule) {
+            try {
+                // Get fresh client balance for balance-based checks
+                const clientDetails = await bcClient.getClientById(withdrawal.ClientId);
+                const currentBalance = clientDetails?.Balance || 0;
+                const totalBalance = currentBalance + withdrawal.Amount;
+
+                logger.info(`[AutoApproval] Client ${withdrawal.ClientId} balance check: current=₺${currentBalance}, withdrawal=₺${withdrawal.Amount}, total=₺${totalBalance}`);
+
+                // Check min_balance_limit (total balance must be >= min_balance_limit)
+                if (matchedBonusRule.min_balance_limit > 0) {
+                    if (totalBalance < matchedBonusRule.min_balance_limit) {
+                        logger.info(`[AutoApproval] Min balance check FAILED: ₺${totalBalance} < ₺${matchedBonusRule.min_balance_limit}`);
+                        return {
+                            approved: false,
+                            reason: `MIN_BALANCE: Toplam bakiye ₺${totalBalance} < Gerekli ₺${matchedBonusRule.min_balance_limit}`,
+                            ruleResult: { passed: false, failedRules: [`MIN_BALANCE: ₺${totalBalance} < ₺${matchedBonusRule.min_balance_limit}`] }
+                        };
+                    }
+                    logger.info(`[AutoApproval] Min balance check PASSED: ₺${totalBalance} >= ₺${matchedBonusRule.min_balance_limit}`);
+                }
+
+                // Check max_remaining_balance (remaining balance after withdrawal must be <= limit)
+                if (matchedBonusRule.max_remaining_balance > 0) {
+                    if (currentBalance > matchedBonusRule.max_remaining_balance && !matchedBonusRule.delete_excess_balance) {
+                        logger.info(`[AutoApproval] Max remaining check FAILED: ₺${currentBalance} > ₺${matchedBonusRule.max_remaining_balance}`);
+                        return {
+                            approved: false,
+                            reason: `MAX_REMAINING: Kalan bakiye ₺${currentBalance} > Max izin verilen ₺${matchedBonusRule.max_remaining_balance}`,
+                            ruleResult: { passed: false, failedRules: [`MAX_REMAINING: ₺${currentBalance} > ₺${matchedBonusRule.max_remaining_balance}`] }
+                        };
+                    }
+                }
+
+                // Handle delete_excess_balance
+                if (matchedBonusRule.delete_excess_balance && currentBalance > 0) {
+                    logger.info(`[AutoApproval] Deleting excess balance: ₺${currentBalance} for client ${withdrawal.ClientId}`);
+
+                    await bcClient.createClientPaymentDocument({
+                        ClientId: withdrawal.ClientId,
+                        CurrencyId: 'TRY',
+                        DocTypeInt: 4,
+                        Amount: currentBalance,
+                        Info: `Bonus Fazlası - ${matchedBonusRule.name}`
+                    });
+
+                    logger.info(`[AutoApproval] Balance deleted successfully for client ${withdrawal.ClientId}`);
+                }
+            } catch (balanceError) {
+                logger.error(`[AutoApproval] Balance check/deletion failed:`, balanceError.message);
+                return {
+                    approved: false,
+                    reason: `Bakiye işlem hatası: ${balanceError.message}`,
+                    ruleResult: { passed: false, failedRules: [`BALANCE_ERROR: ${balanceError.message}`] }
+                };
+            }
+        }
+
         const bcResponse = await bcClient.payWithdrawalRequest(withdrawal);
 
         // Log to DB
@@ -397,7 +489,9 @@ async function processAutoApproval(withdrawal, snapshot) {
 
         return {
             approved: true,
-            reason: 'Tüm kurallar geçti, otomatik onaylandı',
+            reason: matchedBonusRule?.delete_excess_balance
+                ? 'Tüm kurallar geçti, bakiye silindi, otomatik onaylandı'
+                : 'Tüm kurallar geçti, otomatik onaylandı',
             ruleResult,
             bcResponse
         };

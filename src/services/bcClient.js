@@ -202,6 +202,72 @@ class BCClient {
 
         return response;
     }
+
+    /**
+     * Get client details by ID
+     * @param {number} clientId - Client ID
+     * @returns {Object} Client data including Balance, IsVerified, BirthDate
+     */
+    async getClientById(clientId) {
+        const token = await tokenService.getToken();
+        const url = `${this.baseUrl}/Client/GetClientById?id=${clientId}`;
+
+        try {
+            const response = await axios.get(url, {
+                headers: {
+                    'authentication': token,
+                    'Content-Type': 'application/json',
+                    'Origin': 'https://backoffice.betcostatic.com',
+                    'Referer': 'https://backoffice.betcostatic.com/'
+                },
+                timeout: 15000
+            });
+
+            if (response.data?.HasError) {
+                throw new Error(response.data?.AlertMessage || 'GetClientById API Error');
+            }
+
+            return response.data?.Data || null;
+        } catch (error) {
+            logger.error('GetClientById error', { clientId, error: error.message });
+            return null;
+        }
+    }
+
+    /**
+     * Create a client payment document (for balance deduction)
+     * @param {Object} payload - { ClientId, CurrencyId, DocTypeInt, Amount, Info }
+     * @returns {Object} BC API response
+     */
+    async createClientPaymentDocument(payload) {
+        logger.info('Creating payment document (balance deduction)', {
+            clientId: payload.ClientId,
+            amount: payload.Amount
+        });
+
+        const data = {
+            ClientId: payload.ClientId,
+            CurrencyId: payload.CurrencyId || 'TRY',
+            DocTypeInt: payload.DocTypeInt || 4,
+            PaymentSystemId: null,
+            Amount: String(payload.Amount),
+            Info: payload.Info || 'Bonus FAZLASI'
+        };
+
+        const response = await this.post('/Client/CreateClientPaymentDocument', data);
+
+        if (response.HasError) {
+            throw new Error(response.AlertMessage || 'Balance deduction failed');
+        }
+
+        logger.info('Balance deduction successful', {
+            clientId: payload.ClientId,
+            amount: payload.Amount,
+            docId: response.Data?.Id
+        });
+
+        return response;
+    }
 }
 const bcClient = new BCClient();
 

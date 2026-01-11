@@ -243,6 +243,55 @@ app.get('/api/client/:clientId/kpi', async (req, res) => {
 });
 
 /**
+ * GET /api/client/:clientId/details
+ * Oyuncu detay bilgileri (GetClientById API)
+ */
+app.get('/api/client/:clientId/details', async (req, res) => {
+    try {
+        const clientId = parseInt(req.params.clientId);
+        const client = await bcClient.getClientById(clientId);
+
+        if (!client) {
+            return res.json({ success: false, error: 'Client not found' });
+        }
+
+        // Calculate age from BirthDate
+        let age = null;
+        if (client.BirthDate) {
+            const birthDate = new Date(client.BirthDate);
+            const today = new Date();
+            age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+            }
+        }
+
+        res.json({
+            success: true,
+            data: {
+                id: client.Id,
+                login: client.Login,
+                firstName: client.FirstName,
+                lastName: client.LastName,
+                balance: client.Balance,
+                isVerified: client.IsVerified,
+                birthDate: client.BirthDate,
+                age: age,
+                btag: client.BTag,
+                createdDate: client.CreatedLocalDate,
+                lastLoginDate: client.LastLoginLocalDate,
+                isLocked: client.IsLocked,
+                isNoBonus: client.IsNoBonus
+            }
+        });
+    } catch (error) {
+        logger.error('Client Details API Error', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
  * GET /api/client/:clientId/bonus-transactions
  * Son yatırımdan sonraki FreeSpin ve Bonus işlemleri
  */

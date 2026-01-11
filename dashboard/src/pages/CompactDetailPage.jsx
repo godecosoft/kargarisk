@@ -76,6 +76,7 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
     const [bonusTx, setBonusTx] = useState([]);
     const [ipAnalysis, setIpAnalysis] = useState(null);
     const [clientKpi, setClientKpi] = useState(null);
+    const [clientDetails, setClientDetails] = useState(null);
     const [loading, setLoading] = useState(true);
 
     // Load all data
@@ -113,10 +114,14 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                     setIpAnalysis(ip);
                 }
 
-                // Always fetch fresh KPI
-                const { fetchClientKpi } = await import('../services/api');
-                const kpiRes = await fetchClientKpi(clientId);
+                // Always fetch fresh KPI and Client Details
+                const { fetchClientKpi, fetchClientDetails } = await import('../services/api');
+                const [kpiRes, detailsRes] = await Promise.all([
+                    fetchClientKpi(clientId),
+                    fetchClientDetails(clientId)
+                ]);
                 if (kpiRes.success) setClientKpi(kpiRes.data);
+                if (detailsRes.success) setClientDetails(detailsRes.data);
             } catch (e) {
                 console.error('Load error:', e);
             }
@@ -185,34 +190,56 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
             )}
 
             {/* Client KPI Stats Bar */}
-            {clientKpi && (
+            {(clientKpi || clientDetails) && (
                 <div className="kpi-bar">
-                    <div className="kpi-stat">
-                        <span className="kpi-label">Toplam Yatırım</span>
-                        <span className="kpi-value">{formatCurrency(clientKpi.depositAmount)} <small>({clientKpi.depositCount}x)</small></span>
-                    </div>
-                    <div className="kpi-stat">
-                        <span className="kpi-label">Toplam Çekim</span>
-                        <span className="kpi-value">{formatCurrency(clientKpi.withdrawalAmount)} <small>({clientKpi.withdrawalCount}x)</small></span>
-                    </div>
-                    <div className="kpi-stat">
-                        <span className="kpi-label">Son Çekim</span>
-                        <span className="kpi-value">
-                            {formatCurrency(clientKpi.lastWithdrawalAmount)}
-                            {clientKpi.lastWithdrawalTime && (
-                                <small> • {formatTime(clientKpi.lastWithdrawalTime)}</small>
+                    {clientDetails && (
+                        <>
+                            <div className="kpi-stat balance">
+                                <span className="kpi-label">Bakiye</span>
+                                <span className="kpi-value">{formatCurrency(clientDetails.balance)}</span>
+                            </div>
+                            <div className={`kpi-stat ${clientDetails.isVerified ? 'verified' : 'unverified'}`}>
+                                <span className="kpi-label">KYC</span>
+                                <span className="kpi-value">{clientDetails.isVerified ? '✓ Onaylı' : '✗ Onaysız'}</span>
+                            </div>
+                            {clientDetails.birthDate && (
+                                <div className="kpi-stat">
+                                    <span className="kpi-label">Yaş</span>
+                                    <span className="kpi-value">{clientDetails.age} <small>({new Date(clientDetails.birthDate).toLocaleDateString('tr-TR')})</small></span>
+                                </div>
                             )}
-                        </span>
-                    </div>
-                    <div className="kpi-stat">
-                        <span className="kpi-label">Spor Bahis</span>
-                        <span className="kpi-value">{clientKpi.totalSportBets} <small>({clientKpi.totalUnsettledBets} açık)</small></span>
-                    </div>
-                    {clientKpi.btag && (
-                        <div className="kpi-stat btag">
-                            <span className="kpi-label">BTag</span>
-                            <span className="kpi-value">{clientKpi.btag}</span>
-                        </div>
+                        </>
+                    )}
+                    {clientKpi && (
+                        <>
+                            <div className="kpi-stat">
+                                <span className="kpi-label">Toplam Yatırım</span>
+                                <span className="kpi-value">{formatCurrency(clientKpi.depositAmount)} <small>({clientKpi.depositCount}x)</small></span>
+                            </div>
+                            <div className="kpi-stat">
+                                <span className="kpi-label">Toplam Çekim</span>
+                                <span className="kpi-value">{formatCurrency(clientKpi.withdrawalAmount)} <small>({clientKpi.withdrawalCount}x)</small></span>
+                            </div>
+                            <div className="kpi-stat">
+                                <span className="kpi-label">Son Çekim</span>
+                                <span className="kpi-value">
+                                    {formatCurrency(clientKpi.lastWithdrawalAmount)}
+                                    {clientKpi.lastWithdrawalTime && (
+                                        <small> • {formatTime(clientKpi.lastWithdrawalTime)}</small>
+                                    )}
+                                </span>
+                            </div>
+                            <div className="kpi-stat">
+                                <span className="kpi-label">Spor Bahis</span>
+                                <span className="kpi-value">{clientKpi.totalSportBets} <small>({clientKpi.totalUnsettledBets} açık)</small></span>
+                            </div>
+                            {clientKpi.btag && (
+                                <div className="kpi-stat btag">
+                                    <span className="kpi-label">BTag</span>
+                                    <span className="kpi-value">{clientKpi.btag}</span>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             )}
@@ -509,6 +536,12 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                 .kpi-value small { font-size: 11px; color: var(--text-muted); font-weight: 400; }
                 .kpi-stat.btag { background: var(--status-processing-bg); }
                 .kpi-stat.btag .kpi-value { color: var(--status-processing); }
+                .kpi-stat.balance { background: rgba(59, 130, 246, 0.1); border: 1px solid #3b82f6; }
+                .kpi-stat.balance .kpi-value { color: #3b82f6; }
+                .kpi-stat.verified { background: rgba(34, 197, 94, 0.1); border: 1px solid #22c55e; }
+                .kpi-stat.verified .kpi-value { color: #22c55e; }
+                .kpi-stat.unverified { background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; }
+                .kpi-stat.unverified .kpi-value { color: #ef4444; }
 
                 .detail-grid {
                     display: grid;

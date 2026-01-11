@@ -98,13 +98,18 @@ async function createSnapshot(withdrawal) {
     logger.info(`[SnapshotService] Creating snapshot for withdrawal ${withdrawalId}`);
 
     try {
+        // Get bcClient for client details
+        const bcClient = require('./bcClient');
+
         // Fetch ALL data in parallel (same APIs as detail page)
-        const [turnoverRes, bonusesRes, sportsRes, bonusTxRes, ipRes] = await Promise.all([
+        const [turnoverRes, bonusesRes, sportsRes, bonusTxRes, ipRes, clientRes, kpiRes] = await Promise.all([
             turnoverService.getTurnoverReport(clientId, null, withdrawal.Amount, withdrawal.Balance),
             bonusService.getLastBonuses(clientId, 5),
             fetchSportsData(clientId),
             fetchBonusTransactions(clientId),
-            ipControlService.getIPAnalysis(clientId, 7)
+            ipControlService.getIPAnalysis(clientId, 7),
+            bcClient.getClientById(clientId),
+            bcClient.getClientKpi(clientId)
         ]);
 
         // Extract decision from turnover report
@@ -113,6 +118,33 @@ async function createSnapshot(withdrawal) {
         const withdrawalType = turnoverRes.withdrawalType?.type || 'DEPOSIT';
 
         // Save to database
+        // Prepare client data with full details (including KPI)
+        const clientData = {
+            balance: withdrawal.Balance,
+            clientId,
+            // From getClientById response
+            currentBalance: clientRes?.Balance,
+            isVerified: clientRes?.IsVerified,
+            birthDate: clientRes?.BirthDate,
+            age: clientRes?.BirthDate ? calculateAge(clientRes.BirthDate) : null,
+            firstName: clientRes?.FirstName,
+            lastName: clientRes?.LastName,
+            btag: clientRes?.BTag,
+            isLocked: clientRes?.IsLocked,
+            isNoBonus: clientRes?.IsNoBonus,
+            // From getClientKpi response
+            kpi: {
+                depositAmount: kpiRes?.DepositAmount,
+                depositCount: kpiRes?.DepositCount,
+                withdrawalAmount: kpiRes?.WithdrawalAmount,
+                withdrawalCount: kpiRes?.WithdrawalCount,
+                lastWithdrawalAmount: kpiRes?.LastWithdrawalAmount,
+                lastWithdrawalTime: kpiRes?.LastWithdrawalTimeLocal,
+                totalSportBets: kpiRes?.TotalSportBets,
+                totalUnsettledBets: kpiRes?.TotalUnsettledBets
+            }
+        };
+
         await pool.query(`
             INSERT INTO withdrawals (
                 id, client_id, client_login, amount, status, payment_method, request_time,
@@ -135,7 +167,7 @@ async function createSnapshot(withdrawal) {
             decisionReason,
             withdrawalType,
             JSON.stringify(withdrawal),
-            JSON.stringify({ balance: withdrawal.Balance, clientId }),
+            JSON.stringify(clientData),
             JSON.stringify(turnoverRes),
             JSON.stringify(sportsRes),
             JSON.stringify(bonusesRes),
@@ -391,6 +423,21 @@ async function saveFailedSnapshot(withdrawal, errorReason) {
  */
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Calculate age from birth date
+ */
+function calculateAge(birthDate) {
+    if (!birthDate) return null;
+    const birth = new Date(birthDate);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age--;
+    }
+    return age;
 }
 
 // Helper: Fetch sports data

@@ -13,9 +13,33 @@ export default function BonusRulesPage() {
     const [formData, setFormData] = useState({
         name: '',
         match_keyword: '',
-        max_amount: 1000,
+        max_amount: 0,
         ignore_deposit_rule: false,
-        auto_approval_enabled: false
+        auto_approval_enabled: false,
+        turnover_multiplier: 0,
+        min_withdrawal_multiplier: 0,
+        max_withdrawal_multiplier: 0,
+        min_balance_limit: 0,
+        fixed_withdrawal_amount: 0,
+        max_remaining_balance: 0,
+        require_deposit_id: false,
+        delete_excess_balance: false
+    });
+
+    const resetFormData = () => ({
+        name: '',
+        match_keyword: '',
+        max_amount: 0,
+        ignore_deposit_rule: false,
+        auto_approval_enabled: false,
+        turnover_multiplier: 0,
+        min_withdrawal_multiplier: 0,
+        max_withdrawal_multiplier: 0,
+        min_balance_limit: 0,
+        fixed_withdrawal_amount: 0,
+        max_remaining_balance: 0,
+        require_deposit_id: false,
+        delete_excess_balance: false
     });
 
     useEffect(() => {
@@ -49,13 +73,7 @@ export default function BonusRulesPage() {
 
             setShowAddModal(false);
             setEditingRule(null);
-            setFormData({
-                name: '',
-                match_keyword: '',
-                max_amount: 1000,
-                ignore_deposit_rule: false,
-                auto_approval_enabled: false
-            });
+            setFormData(resetFormData());
             loadRules(); // Reload list
         } catch (err) {
             alert('Hata: ' + err.message);
@@ -77,9 +95,17 @@ export default function BonusRulesPage() {
         setFormData({
             name: rule.name,
             match_keyword: rule.match_keyword,
-            max_amount: rule.max_amount,
+            max_amount: rule.max_amount || 0,
             ignore_deposit_rule: Boolean(rule.ignore_deposit_rule),
-            auto_approval_enabled: Boolean(rule.auto_approval_enabled)
+            auto_approval_enabled: Boolean(rule.auto_approval_enabled),
+            turnover_multiplier: rule.turnover_multiplier || 0,
+            min_withdrawal_multiplier: rule.min_withdrawal_multiplier || 0,
+            max_withdrawal_multiplier: rule.max_withdrawal_multiplier || 0,
+            min_balance_limit: rule.min_balance_limit || 0,
+            fixed_withdrawal_amount: rule.fixed_withdrawal_amount || 0,
+            max_remaining_balance: rule.max_remaining_balance || 0,
+            require_deposit_id: Boolean(rule.require_deposit_id),
+            delete_excess_balance: Boolean(rule.delete_excess_balance)
         });
         setShowAddModal(true);
     };
@@ -102,13 +128,7 @@ export default function BonusRulesPage() {
                 </div>
                 <button className="primary-btn" onClick={() => {
                     setEditingRule(null);
-                    setFormData({
-                        name: '',
-                        match_keyword: '',
-                        max_amount: 1000,
-                        ignore_deposit_rule: false,
-                        auto_approval_enabled: false
-                    });
+                    setFormData(resetFormData());
                     setShowAddModal(true);
                 }}>
                     <Plus size={16} /> Yeni Kural Ekle
@@ -253,11 +273,57 @@ export default function BonusRulesPage() {
                                     <label>Max Çekim (Yatırım Katı)</label>
                                     <input
                                         type="number"
-                                        placeholder="Örn: 20"
+                                        placeholder="Örn: 10"
                                         value={formData.max_withdrawal_multiplier}
                                         onChange={e => setFormData({ ...formData, max_withdrawal_multiplier: e.target.value })}
                                     />
                                     <small>Yatırımın en fazla kaç katı çekilebilir?</small>
+                                </div>
+                            </div>
+
+                            <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div className="form-group">
+                                    <label>Min Çekim (Yatırım Katı)</label>
+                                    <input
+                                        type="number"
+                                        placeholder="Örn: 5"
+                                        value={formData.min_withdrawal_multiplier}
+                                        onChange={e => setFormData({ ...formData, min_withdrawal_multiplier: e.target.value })}
+                                    />
+                                    <small>Yatırımın en az kaç katı çekilmeli?</small>
+                                </div>
+                                <div className="form-group">
+                                    <label>Minimum Bakiye Şartı (₺)</label>
+                                    <input
+                                        type="number"
+                                        placeholder="Örn: 15000"
+                                        value={formData.min_balance_limit}
+                                        onChange={e => setFormData({ ...formData, min_balance_limit: e.target.value })}
+                                    />
+                                    <small>Çekim için ulaşılması gereken bakiye</small>
+                                </div>
+                            </div>
+
+                            <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div className="form-group">
+                                    <label>Sabit Çekim Tutarı (₺)</label>
+                                    <input
+                                        type="number"
+                                        placeholder="Örn: 1000"
+                                        value={formData.fixed_withdrawal_amount}
+                                        onChange={e => setFormData({ ...formData, fixed_withdrawal_amount: e.target.value })}
+                                    />
+                                    <small>Sabit çekim limiti (0 = yok)</small>
+                                </div>
+                                <div className="form-group">
+                                    <label>Max İçeride Bırakılabilir Bakiye (₺)</label>
+                                    <input
+                                        type="number"
+                                        placeholder="Örn: 3"
+                                        value={formData.max_remaining_balance}
+                                        onChange={e => setFormData({ ...formData, max_remaining_balance: e.target.value })}
+                                    />
+                                    <small>0 = tüm bakiye çekilmeli</small>
                                 </div>
                             </div>
 
@@ -268,7 +334,29 @@ export default function BonusRulesPage() {
                                         checked={formData.ignore_deposit_rule}
                                         onChange={e => setFormData({ ...formData, ignore_deposit_rule: e.target.checked })}
                                     />
-                                    <span>Yatırım ve Oran Şartını Yoksay (Deneme bonusları için işaretleyin)</span>
+                                    <span>Yatırım ve Oran Şartını Yoksay (Deneme bonusları için)</span>
+                                </label>
+                            </div>
+
+                            <div className="form-check-group">
+                                <label className="check-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.require_deposit_id}
+                                        onChange={e => setFormData({ ...formData, require_deposit_id: e.target.checked })}
+                                    />
+                                    <span>Yatırım ID Kontrolü Gerekli</span>
+                                </label>
+                            </div>
+
+                            <div className="form-check-group warning">
+                                <label className="check-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.delete_excess_balance}
+                                        onChange={e => setFormData({ ...formData, delete_excess_balance: e.target.checked })}
+                                    />
+                                    <span>Kalan Bakiyeyi Sil (Çekim onayından önce üst bakiye silinir)</span>
                                 </label>
                             </div>
 
@@ -282,6 +370,7 @@ export default function BonusRulesPage() {
                                     <span>Bu bonus için Otomatik Onay açık olsun</span>
                                 </label>
                             </div>
+
 
                         </div>
                         <div className="modal-footer">
@@ -342,8 +431,11 @@ export default function BonusRulesPage() {
                 
                 .form-check-group { margin-bottom: 12px; padding: 10px; border-radius: var(--radius-md); background: var(--bg-tertiary); }
                 .form-check-group.highlight { border: 1px solid var(--brand-primary); background: rgba(99, 102, 241, 0.1); }
+                .form-check-group.warning { border: 1px solid #f59e0b; background: rgba(245, 158, 11, 0.1); }
                 .check-label { display: flex; align-items: center; gap: 10px; font-size: 13px; cursor: pointer; }
                 .check-label input { width: 16px; height: 16px; }
+                
+                .modal-body { max-height: 60vh; overflow-y: auto; padding-right: 8px; }
 
                 .primary-btn { display: flex; items-center; gap: 8px; background: var(--brand-primary); color: white; border: none; padding: 10px 16px; border-radius: var(--radius-md); font-weight: 600; cursor: pointer; }
                 .secondary-btn { background: var(--bg-tertiary); color: var(--text-primary); border: none; padding: 10px 16px; border-radius: var(--radius-md); font-weight: 600; cursor: pointer; }
