@@ -1,6 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { Shield, Save, AlertTriangle, Loader2, Power, Zap, Ban, DollarSign, Gamepad2, Trophy, Gift, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Shield, Save, AlertTriangle, Loader2, Power, Zap, Ban, DollarSign, Gamepad2, Trophy, Gift, RefreshCw, X, Plus } from 'lucide-react';
 import { fetchRules, saveRule, fetchAutoApprovalRules, updateAutoApprovalRule } from '../services/api';
+
+// Custom debounce hook
+function useDebounce(callback, delay) {
+    const timeoutRef = useRef(null);
+
+    const debouncedCallback = useCallback((...args) => {
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+        }
+        timeoutRef.current = setTimeout(() => {
+            callback(...args);
+        }, delay);
+    }, [callback, delay]);
+
+    return debouncedCallback;
+}
 
 function RuleEnginePage() {
     const [loading, setLoading] = useState(true);
@@ -10,9 +26,23 @@ function RuleEnginePage() {
     });
     const [autoRules, setAutoRules] = useState({});
 
+    // Local state for inputs (prevents lag)
+    const [localValues, setLocalValues] = useState({});
+    const [newGameInput, setNewGameInput] = useState('');
+
     useEffect(() => {
         loadAllRules();
     }, []);
+
+    // Sync local values when autoRules changes
+    useEffect(() => {
+        setLocalValues({
+            MAX_AMOUNT: autoRules.MAX_AMOUNT?.value || 5000,
+            MAX_WITHDRAWAL_RATIO: autoRules.MAX_WITHDRAWAL_RATIO?.value || 30,
+            TURNOVER_COMPLETE: autoRules.TURNOVER_COMPLETE?.value || 100,
+            FORBIDDEN_GAMES: autoRules.FORBIDDEN_GAMES?.value || ''
+        });
+    }, [autoRules]);
 
     const loadAllRules = async () => {
         setLoading(true);
@@ -72,7 +102,8 @@ function RuleEnginePage() {
         }
     };
 
-    const handleUpdateRuleValue = async (ruleKey, newValue) => {
+    // Debounced API update (waits 800ms after typing stops)
+    const debouncedUpdate = useDebounce(async (ruleKey, newValue) => {
         const rule = autoRules[ruleKey];
         if (!rule) return;
 
@@ -83,8 +114,31 @@ function RuleEnginePage() {
                 [ruleKey]: { ...prev[ruleKey], value: newValue }
             }));
         } catch (error) {
-            alert('Güncelleme hatası: ' + error.message);
+            console.error('Güncelleme hatası:', error.message);
         }
+    }, 800);
+
+    // Handle local input changes (no lag)
+    const handleLocalChange = (ruleKey, value) => {
+        setLocalValues(prev => ({ ...prev, [ruleKey]: value }));
+        debouncedUpdate(ruleKey, value);
+    };
+
+    // Tag management for forbidden games
+    const forbiddenGames = (localValues.FORBIDDEN_GAMES || '').split(',').map(g => g.trim()).filter(g => g);
+
+    const addGame = () => {
+        if (!newGameInput.trim()) return;
+        const updated = [...forbiddenGames, newGameInput.trim()].join(',');
+        setLocalValues(prev => ({ ...prev, FORBIDDEN_GAMES: updated }));
+        debouncedUpdate('FORBIDDEN_GAMES', updated);
+        setNewGameInput('');
+    };
+
+    const removeGame = (gameToRemove) => {
+        const updated = forbiddenGames.filter(g => g !== gameToRemove).join(',');
+        setLocalValues(prev => ({ ...prev, FORBIDDEN_GAMES: updated }));
+        debouncedUpdate('FORBIDDEN_GAMES', updated);
     };
 
     const ruleIcons = {
@@ -214,8 +268,8 @@ function RuleEnginePage() {
                                 type="number"
                                 step="500"
                                 min="0"
-                                value={autoRules.MAX_AMOUNT?.value || 5000}
-                                onChange={(e) => handleUpdateRuleValue('MAX_AMOUNT', e.target.value)}
+                                value={localValues.MAX_AMOUNT || ''}
+                                onChange={(e) => handleLocalChange('MAX_AMOUNT', e.target.value)}
                                 className="filter-input"
                                 style={{ width: '100%', fontSize: '16px', padding: '10px' }}
                             />
@@ -233,13 +287,13 @@ function RuleEnginePage() {
                                 type="number"
                                 step="5"
                                 min="1"
-                                value={autoRules.MAX_WITHDRAWAL_RATIO?.value || 30}
-                                onChange={(e) => handleUpdateRuleValue('MAX_WITHDRAWAL_RATIO', e.target.value)}
+                                value={localValues.MAX_WITHDRAWAL_RATIO || ''}
+                                onChange={(e) => handleLocalChange('MAX_WITHDRAWAL_RATIO', e.target.value)}
                                 className="filter-input"
                                 style={{ width: '100%', fontSize: '16px', padding: '10px' }}
                             />
                             <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>
-                                Çekim tutarı yatırımın bu katını aşarsa manuel onaya gider. (Örn: 30 = yatırımın 30 katına kadar)
+                                Çekim tutarı yatırımın bu katını aşarsa manuel onaya gider.
                             </div>
                         </div>
 
@@ -252,8 +306,8 @@ function RuleEnginePage() {
                                 type="number"
                                 step="10"
                                 min="0"
-                                value={autoRules.TURNOVER_COMPLETE?.value || 100}
-                                onChange={(e) => handleUpdateRuleValue('TURNOVER_COMPLETE', e.target.value)}
+                                value={localValues.TURNOVER_COMPLETE || ''}
+                                onChange={(e) => handleLocalChange('TURNOVER_COMPLETE', e.target.value)}
                                 className="filter-input"
                                 style={{ width: '100%', fontSize: '16px', padding: '10px' }}
                             />
@@ -262,23 +316,87 @@ function RuleEnginePage() {
                             </div>
                         </div>
 
-                        {/* Forbidden Games */}
+                        {/* Forbidden Games - Tag Based UI */}
                         <div style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
                             <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
                                 Yasaklı Oyun Kelimeleri
                             </label>
-                            <input
-                                type="text"
-                                value={autoRules.FORBIDDEN_GAMES?.value || ''}
-                                onChange={(e) => handleUpdateRuleValue('FORBIDDEN_GAMES', e.target.value)}
-                                className="filter-input"
-                                style={{ width: '100%', fontSize: '14px', padding: '10px' }}
-                                placeholder="Roulette,Blackjack,Aviator..."
-                            />
-                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>
-                                Virgülle ayrılmış liste. Bu kelimeleri içeren oyunlar yasaklı.
+
+                            {/* Tag Display */}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px', minHeight: '32px' }}>
+                                {forbiddenGames.map((game, idx) => (
+                                    <div key={idx} style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        background: 'rgba(239, 68, 68, 0.15)',
+                                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                                        color: 'var(--status-rejected)',
+                                        padding: '4px 10px',
+                                        borderRadius: '16px',
+                                        fontSize: '13px',
+                                        fontWeight: 500
+                                    }}>
+                                        <span>{game}</span>
+                                        <button
+                                            onClick={() => removeGame(game)}
+                                            style={{
+                                                background: 'none',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                padding: '0',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                color: 'var(--status-rejected)'
+                                            }}
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                ))}
+                                {forbiddenGames.length === 0 && (
+                                    <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+                                        Henüz yasaklı oyun yok
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Add New Game Input */}
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <input
+                                    type="text"
+                                    value={newGameInput}
+                                    onChange={(e) => setNewGameInput(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && addGame()}
+                                    className="filter-input"
+                                    style={{ flex: 1, fontSize: '14px', padding: '8px 12px' }}
+                                    placeholder="Oyun adı yazın..."
+                                />
+                                <button
+                                    onClick={addGame}
+                                    disabled={!newGameInput.trim()}
+                                    style={{
+                                        padding: '8px 16px',
+                                        borderRadius: 'var(--radius-md)',
+                                        border: 'none',
+                                        background: newGameInput.trim() ? 'var(--accent-primary)' : 'var(--bg-secondary)',
+                                        color: newGameInput.trim() ? 'white' : 'var(--text-muted)',
+                                        cursor: newGameInput.trim() ? 'pointer' : 'not-allowed',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        fontWeight: 500
+                                    }}
+                                >
+                                    <Plus size={16} />
+                                    Ekle
+                                </button>
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>
+                                Bu kelimeleri içeren oyunlar otomatik onaydan hariç tutulur.
                             </div>
                         </div>
+
 
                     </div>
                 </div>
