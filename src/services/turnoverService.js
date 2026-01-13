@@ -234,6 +234,14 @@ function calculateTurnover(transactions, afterTime, requiredAmount, multiplier =
             games: spinHoardingGames
         }
     };
+
+    // DEBUG LOG
+    if (spinHoardingGames.length > 0) {
+        console.log('🚨 [SPIN GÖMME TESPİT]', JSON.stringify(spinHoardingGames));
+    }
+    console.log('[TURNOVER] allCasinoTx count:', allCasinoTx.length, 'firstTxByGame:', JSON.stringify(firstTxByGame));
+
+    return result;
 }
 
 const rulesService = require('./rulesService');

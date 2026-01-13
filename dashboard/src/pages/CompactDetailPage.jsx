@@ -160,6 +160,10 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
             time: g.suspiciousFirstWin?.winTime
         }));
 
+    // DEBUG LOG
+    console.log('[FRONTEND] spinHoardingData:', spinHoardingData);
+    console.log('[FRONTEND] hasSpinHoarding:', hasSpinHoarding);
+
     return (
         <div className="compact-detail-page">
             {/* Header Bar */}
