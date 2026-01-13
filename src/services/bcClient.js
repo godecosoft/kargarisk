@@ -268,6 +268,31 @@ class BCClient {
 
         return response;
     }
+
+    /**
+     * Get wagering bonus info (for wagering progress)
+     * @param {number} playerId - Client ID
+     * @param {number} bonusDefId - ExternalId from bonus
+     * @param {number} bonusPlayerExternalId - Id from bonus
+     * @returns {Object} { AmountToWager, WageredAmount, ... }
+     */
+    async getWageringBonusInfo(playerId, bonusDefId, bonusPlayerExternalId) {
+        const payload = {
+            PlayerId: playerId,
+            BonusDefId: bonusDefId,
+            BonusPlayerExternalId: bonusPlayerExternalId
+        };
+
+        logger.debug('Fetching wagering bonus info', payload);
+
+        try {
+            const response = await this.post('/Client/GetClientWageringBonusInfo', payload);
+            return response.Data || null;
+        } catch (error) {
+            logger.error('GetClientWageringBonusInfo error', { playerId, error: error.message });
+            return null;
+        }
+    }
 }
 const bcClient = new BCClient();
 
