@@ -439,107 +439,53 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                                 )}
                             </div>
 
-                            {/* Son Bonuslar - GELİŞTİRİLMİŞ */}
+                            {/* Son Bonuslar - KOMPAKT */}
                             <div className="sub-section">
                                 <div className="section-title"><Gift size={16} /> Son Bonuslar</div>
                                 {bonuses.length === 0 ? (
                                     <div className="empty-message">Bonus yok</div>
                                 ) : (
-                                    <div className="bonus-list">
+                                    <div className="bonus-list" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                         {bonuses.slice(0, 3).map((b, i) => (
-                                            <div key={i} className="bonus-card" style={{
+                                            <div key={i} style={{
                                                 background: 'var(--bg-tertiary)',
-                                                borderRadius: 'var(--radius-md)',
-                                                padding: '10px 12px',
-                                                marginBottom: '8px',
+                                                borderRadius: '6px',
+                                                padding: '8px 10px',
                                                 border: '1px solid var(--border-subtle)'
                                             }}>
-                                                {/* Header: İsim + Tutar */}
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-                                                    <div>
-                                                        <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>{b.name}</div>
-                                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                                            {b.typeName} • {formatTime(b.createdAt)}
+                                                {/* Tek Satır: İsim + Badges + Tutar */}
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <div style={{ fontWeight: 600, fontSize: '12px', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                            {b.name}
+                                                        </div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px' }}>
+                                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{b.typeName}</span>
+                                                            <span style={{
+                                                                padding: '1px 6px', borderRadius: '8px', fontSize: '9px', fontWeight: 600,
+                                                                background: b.acceptanceType === 2 ? 'rgba(34,197,94,0.15)' : 'rgba(234,179,8,0.15)',
+                                                                color: b.acceptanceType === 2 ? 'var(--status-approved)' : 'var(--status-pending)'
+                                                            }}>{b.acceptanceTypeName}</span>
+                                                            <span style={{
+                                                                padding: '1px 6px', borderRadius: '8px', fontSize: '9px', fontWeight: 600,
+                                                                background: b.resultType === 1 ? 'rgba(34,197,94,0.15)' : b.resultType === 3 ? 'rgba(239,68,68,0.15)' : 'rgba(99,102,241,0.15)',
+                                                                color: b.resultType === 1 ? 'var(--status-approved)' : b.resultType === 3 ? 'var(--status-rejected)' : 'var(--accent-primary)'
+                                                            }}>{b.resultTypeName}</span>
+                                                            {b.isFreeSpin && <span style={{ fontSize: '10px' }}>🎰</span>}
                                                         </div>
                                                     </div>
-                                                    <div style={{ textAlign: 'right' }}>
-                                                        <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--accent-primary)' }}>
-                                                            {formatCurrency(b.amount)}
-                                                        </div>
-                                                        {b.paidAmount > 0 && (
-                                                            <div style={{ fontSize: '11px', color: 'var(--status-approved)' }}>
-                                                                Ödenen: {formatCurrency(b.paidAmount)}
-                                                            </div>
-                                                        )}
+                                                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                                        <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--accent-primary)' }}>{formatCurrency(b.amount)}</div>
+                                                        {b.paidAmount > 0 && <div style={{ fontSize: '10px', color: 'var(--status-approved)' }}>+{formatCurrency(b.paidAmount)}</div>}
                                                     </div>
                                                 </div>
-
-                                                {/* Status Badges */}
-                                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: b.wageringInfo ? '8px' : '0' }}>
-                                                    {/* Kabul Durumu */}
-                                                    <span style={{
-                                                        padding: '2px 8px',
-                                                        borderRadius: '12px',
-                                                        fontSize: '10px',
-                                                        fontWeight: 600,
-                                                        background: b.acceptanceType === 2 ? 'rgba(34, 197, 94, 0.15)' : 'rgba(234, 179, 8, 0.15)',
-                                                        color: b.acceptanceType === 2 ? 'var(--status-approved)' : 'var(--status-pending)'
-                                                    }}>
-                                                        {b.acceptanceTypeName}
-                                                    </span>
-
-                                                    {/* Sonuç Durumu */}
-                                                    <span style={{
-                                                        padding: '2px 8px',
-                                                        borderRadius: '12px',
-                                                        fontSize: '10px',
-                                                        fontWeight: 600,
-                                                        background: b.resultType === 1 ? 'rgba(34, 197, 94, 0.15)' :
-                                                            b.resultType === 3 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(99, 102, 241, 0.15)',
-                                                        color: b.resultType === 1 ? 'var(--status-approved)' :
-                                                            b.resultType === 3 ? 'var(--status-rejected)' : 'var(--accent-primary)'
-                                                    }}>
-                                                        {b.resultTypeName}
-                                                    </span>
-
-                                                    {/* FreeSpin/Wagering badge */}
-                                                    {b.isFreeSpin && (
-                                                        <span style={{
-                                                            padding: '2px 8px',
-                                                            borderRadius: '12px',
-                                                            fontSize: '10px',
-                                                            fontWeight: 600,
-                                                            background: 'rgba(236, 72, 153, 0.15)',
-                                                            color: '#ec4899'
-                                                        }}>
-                                                            🎰 FreeSpin
-                                                        </span>
-                                                    )}
-                                                </div>
-
-                                                {/* Çevrim Progress Bar (WageringBonus için) */}
+                                                {/* Çevrim (varsa) - mini progress */}
                                                 {b.wageringInfo && (
-                                                    <div style={{ marginTop: '4px' }}>
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                                                            <span>Çevrim: {formatCurrency(b.wageringInfo.wageredAmount)} / {formatCurrency(b.wageringInfo.amountToWager)}</span>
-                                                            <span style={{ fontWeight: 600, color: b.wageringInfo.percentage >= 100 ? 'var(--status-approved)' : 'var(--accent-primary)' }}>
-                                                                %{b.wageringInfo.percentage}
-                                                            </span>
+                                                    <div style={{ marginTop: '5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <div style={{ flex: 1, height: '3px', background: 'var(--bg-secondary)', borderRadius: '2px', overflow: 'hidden' }}>
+                                                            <div style={{ width: `${Math.min(b.wageringInfo.percentage, 100)}%`, height: '100%', background: b.wageringInfo.percentage >= 100 ? 'var(--status-approved)' : 'var(--accent-primary)' }} />
                                                         </div>
-                                                        <div style={{
-                                                            height: '4px',
-                                                            background: 'var(--bg-secondary)',
-                                                            borderRadius: '2px',
-                                                            overflow: 'hidden'
-                                                        }}>
-                                                            <div style={{
-                                                                width: `${Math.min(b.wageringInfo.percentage, 100)}%`,
-                                                                height: '100%',
-                                                                background: b.wageringInfo.percentage >= 100 ? 'var(--status-approved)' : 'var(--accent-primary)',
-                                                                borderRadius: '2px',
-                                                                transition: 'width 0.3s ease'
-                                                            }} />
-                                                        </div>
+                                                        <span style={{ fontSize: '9px', fontWeight: 600, color: b.wageringInfo.percentage >= 100 ? 'var(--status-approved)' : 'var(--text-muted)' }}>%{b.wageringInfo.percentage}</span>
                                                     </div>
                                                 )}
                                             </div>
