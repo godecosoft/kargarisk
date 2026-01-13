@@ -210,7 +210,7 @@ function calculateTurnover(transactions, afterTime, requiredAmount, multiplier =
         }))
         .sort((a, b) => b.betAmount - a.betAmount);
 
-    return {
+    const result = {
         casino: {
             amount: casinoTurnover,
             percentage: requiredTurnover > 0 ? Math.round((casinoTurnover / requiredTurnover) * 100) : 0,
@@ -228,7 +228,6 @@ function calculateTurnover(transactions, afterTime, requiredAmount, multiplier =
         },
         required: requiredTurnover,
         isComplete: totalTurnover >= requiredTurnover,
-        // Spin gömme tespit sonucu
         spinHoarding: {
             detected: spinHoardingGames.length > 0,
             games: spinHoardingGames
@@ -236,10 +235,11 @@ function calculateTurnover(transactions, afterTime, requiredAmount, multiplier =
     };
 
     // DEBUG LOG
-    if (spinHoardingGames.length > 0) {
-        console.log('🚨 [SPIN GÖMME TESPİT]', JSON.stringify(spinHoardingGames));
-    }
-    console.log('[TURNOVER] allCasinoTx count:', allCasinoTx.length, 'firstTxByGame:', JSON.stringify(firstTxByGame));
+    console.log('[TURNOVER] Spin gömme:', {
+        txCount: allCasinoTx.length,
+        detected: spinHoardingGames.length > 0,
+        games: spinHoardingGames
+    });
 
     return result;
 }
