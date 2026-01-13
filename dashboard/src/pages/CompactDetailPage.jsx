@@ -139,6 +139,27 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
     const sportsBets = sports?.bets || [];
     const totalPercentage = turnover?.turnover?.total?.percentage || 0;
 
+    // SPİN GÖMME TESPİTİ
+    // Backend'den gelen kronolojik kontrol sonucu
+    const spinHoardingData = turnover?.turnover?.spinHoarding || { detected: false, games: [] };
+
+    // Alternatif: Her oyundaki suspiciousFirstWin alanını kontrol et
+    const gamesWithSuspiciousWin = casinoGames.filter(g => g.suspiciousFirstWin);
+
+    // Eğer backend'den geldiyse onu kullan, yoksa oyun bazlı kontrol
+    const hasSpinHoarding = spinHoardingData.detected || gamesWithSuspiciousWin.length > 0;
+    const spinHoardingDetails = spinHoardingData.detected
+        ? spinHoardingData.games.map(g => ({
+            game: g.game,
+            amount: g.winAmount,
+            time: g.winTime
+        }))
+        : gamesWithSuspiciousWin.map(g => ({
+            game: g.game,
+            amount: g.suspiciousFirstWin?.winAmount || g.winAmount,
+            time: g.suspiciousFirstWin?.winTime
+        }));
+
     return (
         <div className="compact-detail-page">
             {/* Header Bar */}
@@ -163,28 +184,44 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
             {decisionReason && (
                 <div className="decision-reason">
                     {decisionReason}
-                    {/* Show Risk Details if available */}
-                    {(turnover?.decisionData?.riskAnalysis?.details || withdrawal?.decisionData?.riskAnalysis?.details || []).map((detail, idx) => (
-                        <div key={idx} className="risk-detail-item" style={{ color: 'var(--status-rejected)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <AlertTriangle size={14} /> {detail}
-                        </div>
-                    ))}
                 </div>
             )}
 
-            {/* HIGH RISK BANNER */}
-            {(turnover?.decisionData?.riskAnalysis?.isRisky || withdrawal?.decisionData?.riskAnalysis?.isRisky) && (
+            {/* HIGH RISK BANNER - SPİN GÖMME TESPİTİ */}
+            {hasSpinHoarding && (
                 <div className="risk-banner" style={{
-                    background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--status-rejected)',
-                    borderRadius: 'var(--radius-md)', padding: '12px', marginBottom: '20px',
-                    display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--status-rejected)'
+                    background: 'rgba(239, 68, 68, 0.15)', border: '2px solid var(--status-rejected)',
+                    borderRadius: 'var(--radius-md)', padding: '16px', marginBottom: '20px',
+                    color: 'var(--status-rejected)'
                 }}>
-                    <AlertTriangle size={24} />
-                    <div>
-                        <div style={{ fontWeight: '700' }}>RİSK TESPİT EDİLDİ (Spin Gömme Şüphesi)</div>
-                        <div style={{ fontSize: '13px', opacity: 0.9 }}>
-                            Bu çekim talebinde riskli oyuncu davranışları tespit edildi. Lütfen dikkatle inceleyiniz.
-                        </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                        <AlertTriangle size={24} />
+                        <div style={{ fontWeight: '700', fontSize: '16px' }}>🚨 SPİN GÖMME TESPİT EDİLDİ</div>
+                    </div>
+                    <div style={{ fontSize: '13px', marginBottom: '8px', opacity: 0.9 }}>
+                        Yatırım sonrası ilk işlem olarak kazanç gelen oyunlar (öncesinde bahis yok):
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {spinHoardingDetails.map((item, idx) => (
+                            <div key={idx} style={{
+                                background: 'rgba(239, 68, 68, 0.2)',
+                                padding: '8px 12px',
+                                borderRadius: '4px',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                            }}>
+                                <span>🎰 {item.game}</span>
+                                <span>
+                                    ₺{(item.amount || 0).toLocaleString('tr-TR')}
+                                    {item.time && <small style={{ marginLeft: '8px', opacity: 0.7 }}>
+                                        ({new Date(item.time).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })})
+                                    </small>}
+                                </span>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}

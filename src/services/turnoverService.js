@@ -147,6 +147,49 @@ function calculateTurnover(transactions, afterTime, requiredAmount, multiplier =
         }
     });
 
+    // ═══════════════════════════════════════════════════════════════
+    // SPİN GÖMME TESPİTİ (KRONOLOJİK KONTROL)
+    // Her oyun için yatırım sonrası İLK İŞLEMİ bul
+    // Eğer ilk işlem WIN ise (öncesinde bet yok) → Spin Gömme Şüphesi
+    // ═══════════════════════════════════════════════════════════════
+
+    // Yatırım sonrası tüm casino işlemlerini kronolojik sırala (bet + win)
+    const allCasinoTx = transactions
+        .filter(t => {
+            if (t.DocumentTypeId !== 10 && t.DocumentTypeId !== 15) return false;
+            if (new Date(t.CreatedLocal) < afterTime) return false;
+            if (t.Game === 'SportsBook') return false;
+            return true;
+        })
+        .sort((a, b) => new Date(a.CreatedLocal) - new Date(b.CreatedLocal));
+
+    // Her oyun için ilk işlem tipini bul
+    const firstTxByGame = {};
+    const spinHoardingGames = [];
+
+    for (const tx of allCasinoTx) {
+        const gameName = tx.Game || 'Bilinmeyen';
+
+        // Bu oyunda ilk işlem mi?
+        if (!firstTxByGame[gameName]) {
+            firstTxByGame[gameName] = {
+                type: tx.DocumentTypeId === 10 ? 'bet' : 'win',
+                amount: tx.Amount,
+                time: tx.CreatedLocal
+            };
+
+            // İlk işlem WIN ise → Spin Gömme!
+            if (tx.DocumentTypeId === 15) {
+                spinHoardingGames.push({
+                    game: gameName,
+                    winAmount: tx.Amount,
+                    winTime: tx.CreatedLocal
+                });
+            }
+        }
+    }
+    // ═══════════════════════════════════════════════════════════════
+
     // Casino toplam
     const casinoTurnover = Object.values(casinoGames).reduce((a, b) => a + b, 0);
     const totalCasinoWins = Object.values(casinoWins).reduce((a, b) => a + b, 0);
@@ -161,50 +204,18 @@ function calculateTurnover(transactions, afterTime, requiredAmount, multiplier =
         .map(game => ({
             game,
             betAmount: casinoGames[game] || 0,
-            winAmount: casinoWins[game] || 0
+            winAmount: casinoWins[game] || 0,
+            // Spin gömme şüphesi: Bu oyunda ilk işlem WIN mi?
+            suspiciousFirstWin: spinHoardingGames.find(s => s.game === game) || null
         }))
         .sort((a, b) => b.betAmount - a.betAmount);
-
-    // İşlem bazlı transaction listesi oluştur (spin gömme tespiti için)
-    // Her kazanç işleminden önce aynı oyunda bahis olmalı
-    const casinoTransactions = [];
-
-    // Bahisleri ekle
-    bets.forEach(bet => {
-        if (bet.Game !== 'SportsBook') {
-            casinoTransactions.push({
-                type: 'bet',
-                game: bet.Game || 'Bilinmeyen',
-                amount: bet.Amount || 0,
-                time: bet.CreatedLocal,
-                timestamp: new Date(bet.CreatedLocal).getTime()
-            });
-        }
-    });
-
-    // Kazançları ekle
-    wins.forEach(win => {
-        if (win.Game !== 'SportsBook') {
-            casinoTransactions.push({
-                type: 'win',
-                game: win.Game || 'Bilinmeyen',
-                amount: win.Amount || 0,
-                time: win.CreatedLocal,
-                timestamp: new Date(win.CreatedLocal).getTime()
-            });
-        }
-    });
-
-    // Zamana göre sırala (eskiden yeniye)
-    casinoTransactions.sort((a, b) => a.timestamp - b.timestamp);
 
     return {
         casino: {
             amount: casinoTurnover,
             percentage: requiredTurnover > 0 ? Math.round((casinoTurnover / requiredTurnover) * 100) : 0,
             winAmount: totalCasinoWins,
-            games: gameBreakdown,
-            transactions: casinoTransactions  // İşlem bazlı veriler
+            games: gameBreakdown
         },
         sports: {
             amount: sportsTurnover,
@@ -216,7 +227,12 @@ function calculateTurnover(transactions, afterTime, requiredAmount, multiplier =
             percentage: requiredTurnover > 0 ? Math.round((totalTurnover / requiredTurnover) * 100) : 0
         },
         required: requiredTurnover,
-        isComplete: totalTurnover >= requiredTurnover
+        isComplete: totalTurnover >= requiredTurnover,
+        // Spin gömme tespit sonucu
+        spinHoarding: {
+            detected: spinHoardingGames.length > 0,
+            games: spinHoardingGames
+        }
     };
 }
 
