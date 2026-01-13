@@ -114,8 +114,29 @@ async function createSnapshot(withdrawal) {
 
         // Extract decision from turnover report
         const botDecision = turnoverRes.decision || 'MANUEL';
-        const decisionReason = turnoverRes.decisionReason || '';
+        let decisionReason = turnoverRes.decisionReason || '';
         const withdrawalType = turnoverRes.withdrawalType?.type || 'DEPOSIT';
+
+        // Perform RISK ANALYSIS (Spin Hoarding Detection)
+        const riskService = require('./riskService');
+        const snapshotDataForRisk = { turnover: turnoverRes };
+        const riskAnalysis = riskService.analyzeRisk(withdrawal, snapshotDataForRisk);
+
+        // Add risk analysis to turnover data
+        turnoverRes.decisionData = {
+            riskAnalysis: {
+                isRisky: riskAnalysis.isRisky,
+                riskLevel: riskAnalysis.totalRiskLevel,
+                details: riskAnalysis.hoarding?.details || [],
+                suspiciousWins: riskAnalysis.suspiciousWins || []
+            }
+        };
+
+        // If HIGH risk, update decision
+        if (riskAnalysis.isRisky && riskAnalysis.totalRiskLevel === 'HIGH') {
+            decisionReason = `RİSK TESPİT: ${riskAnalysis.hoarding?.details?.join(', ') || 'Spin gömme şüphesi'}`;
+            logger.info(`[SnapshotService] HIGH RISK detected for ${withdrawalId}:`, riskAnalysis);
+        }
 
         // Save to database
         // Prepare client data with full details (including KPI)
