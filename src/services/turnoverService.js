@@ -154,21 +154,57 @@ function calculateTurnover(transactions, afterTime, requiredAmount, multiplier =
     const requiredTurnover = requiredAmount * multiplier;
     const totalTurnover = casinoTurnover + sportsTurnover;
 
-    // Oyun dökümü oluştur (en çok oynanan önce)
-    const gameBreakdown = Object.entries(casinoGames)
-        .map(([game, betAmount]) => ({
+    // Oyun dökümü oluştur (bahis VE kazanç olan tüm oyunlar)
+    // CRITICAL: Kazanç olup bahis olmayan oyunları da dahil et (spin gömme tespiti için)
+    const allGames = new Set([...Object.keys(casinoGames), ...Object.keys(casinoWins)]);
+    const gameBreakdown = Array.from(allGames)
+        .map(game => ({
             game,
-            betAmount,
+            betAmount: casinoGames[game] || 0,
             winAmount: casinoWins[game] || 0
         }))
         .sort((a, b) => b.betAmount - a.betAmount);
+
+    // İşlem bazlı transaction listesi oluştur (spin gömme tespiti için)
+    // Her kazanç işleminden önce aynı oyunda bahis olmalı
+    const casinoTransactions = [];
+
+    // Bahisleri ekle
+    bets.forEach(bet => {
+        if (bet.Game !== 'SportsBook') {
+            casinoTransactions.push({
+                type: 'bet',
+                game: bet.Game || 'Bilinmeyen',
+                amount: bet.Amount || 0,
+                time: bet.CreatedLocal,
+                timestamp: new Date(bet.CreatedLocal).getTime()
+            });
+        }
+    });
+
+    // Kazançları ekle
+    wins.forEach(win => {
+        if (win.Game !== 'SportsBook') {
+            casinoTransactions.push({
+                type: 'win',
+                game: win.Game || 'Bilinmeyen',
+                amount: win.Amount || 0,
+                time: win.CreatedLocal,
+                timestamp: new Date(win.CreatedLocal).getTime()
+            });
+        }
+    });
+
+    // Zamana göre sırala (eskiden yeniye)
+    casinoTransactions.sort((a, b) => a.timestamp - b.timestamp);
 
     return {
         casino: {
             amount: casinoTurnover,
             percentage: requiredTurnover > 0 ? Math.round((casinoTurnover / requiredTurnover) * 100) : 0,
             winAmount: totalCasinoWins,
-            games: gameBreakdown
+            games: gameBreakdown,
+            transactions: casinoTransactions  // İşlem bazlı veriler
         },
         sports: {
             amount: sportsTurnover,

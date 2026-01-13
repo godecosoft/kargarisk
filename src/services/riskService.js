@@ -7,18 +7,116 @@ const logger = require('../utils/logger');
 const riskService = {
 
     /**
-     * Check for Spin Hoarding (FreeSpin Gömme/Stoklama)
-     * Logic: If there is a WIN amount but NO BET amount for a specific game in the current turnover period,
-     * it implies the bet was placed in a previous session (e.g. while using a bonus) to hide the win.
+     * Check for Spin Hoarding (FreeSpin Gömme/Stoklama) - TRANSACTION LEVEL
+     * 
+     * Mantık: Her kazanç (win) işleminden ÖNCE aynı oyunda en az bir bahis (bet) olmalı.
+     * Eğer bir kazanç işlemi var ama o oyunda daha önce (yatırım sonrası) bahis yoksa → ŞÜPHELİ
+     * 
+     * Örnek Senaryo:
+     * - 10:00 Yatırım
+     * - 10:05 Sweet Bonanza WIN 500₺ → ŞÜPHELİ (öncesinde bet yok!)
+     * - 10:10 Gates of Olympus BET 100₺ 
+     * - 10:15 Gates of Olympus WIN 300₺ → Normal (öncesinde bet var)
+     * 
+     * Karmaşık Senaryo (spin açıp sonra biraz oynama):
+     * - 10:00 Yatırım
+     * - 10:02 Sweet Bonanza WIN 500₺ → ŞÜPHELİ (öncesinde bet yok!)
+     * - 10:05 Sweet Bonanza BET 50₺
+     * - 10:08 Sweet Bonanza WIN 60₺ → Normal (artık öncesinde bet var)
      * 
      * @param {Object} snapshot - Withdrawal snapshot containing turnover data
-     * @returns {Object} { hasRisk: boolean, riskLevel: 'LOW'|'MEDIUM'|'HIGH', details: string[] }
+     * @returns {Object} { hasRisk: boolean, riskLevel: 'LOW'|'MEDIUM'|'HIGH', details: string[], suspiciousWins: array }
      */
     checkSpinHoarding(snapshot) {
         const result = {
             hasRisk: false,
             riskLevel: 'LOW',
-            details: []
+            details: [],
+            suspiciousWins: []
+        };
+
+        try {
+            // Transaction bazlı veriler
+            const transactions = snapshot?.turnover?.turnover?.casino?.transactions || [];
+
+            if (!Array.isArray(transactions) || transactions.length === 0) {
+                // Fallback: Eski toplam-bazlı kontrol (geriye uyumluluk)
+                return this.checkSpinHoardingLegacy(snapshot);
+            }
+
+            // Her oyun için "ilk bahis zamanını" takip et
+            const firstBetTimeByGame = {};
+            const suspiciousWins = [];
+
+            // Transaction'ları kronolojik sırayla işle
+            for (const tx of transactions) {
+                const game = tx.game;
+                const time = tx.timestamp || new Date(tx.time).getTime();
+
+                if (tx.type === 'bet') {
+                    // Bu oyunda ilk bahis mi?
+                    if (!firstBetTimeByGame[game]) {
+                        firstBetTimeByGame[game] = time;
+                    }
+                } else if (tx.type === 'win') {
+                    // Kazanç işlemi: Bu oyunda daha önce bahis var mı?
+                    const firstBetTime = firstBetTimeByGame[game];
+
+                    if (!firstBetTime || firstBetTime > time) {
+                        // ŞÜPHELİ: Bu oyunda öncesinde bahis yok!
+                        suspiciousWins.push({
+                            game,
+                            amount: tx.amount,
+                            time: tx.time,
+                            reason: 'Kazanç öncesinde bu oyunda bahis bulunamadı'
+                        });
+                    }
+                }
+            }
+
+            // Şüpheli kazançları değerlendir
+            if (suspiciousWins.length > 0) {
+                result.hasRisk = true;
+                result.suspiciousWins = suspiciousWins;
+
+                // Toplam şüpheli kazanç
+                const totalSuspiciousWin = suspiciousWins.reduce((sum, w) => sum + w.amount, 0);
+
+                // Risk seviyesi belirle
+                if (totalSuspiciousWin > 500) {
+                    result.riskLevel = 'HIGH';
+                } else if (totalSuspiciousWin > 100) {
+                    result.riskLevel = 'MEDIUM';
+                } else {
+                    result.riskLevel = 'LOW';
+                }
+
+                // Her şüpheli kazanç için detay ekle
+                for (const sw of suspiciousWins) {
+                    result.details.push(
+                        `🚨 Spin Gömme Şüphesi: ${sw.game} oyununda ₺${sw.amount} kazanç ancak öncesinde bahis yok!`
+                    );
+                }
+            }
+
+            return result;
+
+        } catch (error) {
+            logger.error('Error checking spin hoarding (transaction-level)', { error: error.message });
+            return { hasRisk: false, riskLevel: 'LOW', details: ['Risk analizi hatası'], suspiciousWins: [] };
+        }
+    },
+
+    /**
+     * Legacy check - Toplam bazlı kontrol (geriye uyumluluk)
+     * Eski snapshot'lar transaction verisi içermeyebilir
+     */
+    checkSpinHoardingLegacy(snapshot) {
+        const result = {
+            hasRisk: false,
+            riskLevel: 'LOW',
+            details: [],
+            suspiciousWins: []
         };
 
         try {
@@ -33,17 +131,17 @@ const riskService = {
                 const win = parseFloat(game.winAmount) || 0;
                 const gameName = game.game || 'Bilinmeyen Oyun';
 
-                // Condition for Hoarding: Significant Win with Zero Bet in current period
+                // Koşul: Bahis 0 ama kazanç var
                 if (bet === 0 && win > 0) {
                     result.hasRisk = true;
-                    // If win is substantial (> 100 TL), mark as HIGH risk
+                    result.suspiciousWins.push({ game: gameName, amount: win, reason: 'Toplam bahis 0, kazanç var' });
+
                     if (win > 100) {
                         result.riskLevel = 'HIGH';
-                        result.details.push(`Spin Gömme Şüphesi: ${gameName} oyununda güncel bahis yok (0 TL) ancak kazanç var (${win} TL)`);
+                        result.details.push(`Spin Gömme Şüphesi: ${gameName} (Bet: 0, Win: ₺${win})`);
                     } else {
-                        // Small wins might be negligible or leftovers
                         result.riskLevel = result.riskLevel === 'HIGH' ? 'HIGH' : 'MEDIUM';
-                        result.details.push(`Spin Gömme Şüphesi (Düşük): ${gameName} (Bet: 0, Win: ${win})`);
+                        result.details.push(`Spin Gömme Şüphesi (Düşük): ${gameName} (Bet: 0, Win: ₺${win})`);
                     }
                 }
             }
@@ -51,8 +149,8 @@ const riskService = {
             return result;
 
         } catch (error) {
-            logger.error('Error checking spin hoarding', { error: error.message });
-            return { hasRisk: false, riskLevel: 'LOW', details: ['Risk analizi hatası'] };
+            logger.error('Error checking spin hoarding (legacy)', { error: error.message });
+            return { hasRisk: false, riskLevel: 'LOW', details: ['Risk analizi hatası'], suspiciousWins: [] };
         }
     },
 
@@ -65,7 +163,8 @@ const riskService = {
         return {
             hoarding: hoardingCheck,
             totalRiskLevel: hoardingCheck.riskLevel,
-            isRisky: hoardingCheck.hasRisk
+            isRisky: hoardingCheck.hasRisk,
+            suspiciousWins: hoardingCheck.suspiciousWins || []
         };
     }
 };
