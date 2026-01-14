@@ -14,24 +14,35 @@ import {
     fetchIPAnalysis, fetchBonusTransactions
 } from '../services/api';
 
-// Circular Progress Component - Casino (yeşil) + Spor (mavi)
+// Circular Progress Component - Casino (yeşil) + Spor (mavi) - Oransal
 function CircularProgress({ percentage, casinoPercentage = 0, sportsPercentage = 0, size = 120 }) {
     const strokeWidth = 8;
     const radius = (size - strokeWidth) / 2;
     const circumference = radius * 2 * Math.PI;
 
-    // Her iki yüzdeyi max 100'e sınırla (görsel amaçlı)
-    const casinoPercent = Math.min(casinoPercentage, 100);
-    const sportsPercent = Math.min(sportsPercentage, 100);
-
-    // Casino segmenti - yeşil (başlangıç: -90 derece, yani üst)
-    const casinoOffset = circumference - (casinoPercent / 100) * circumference;
-
-    // Spor segmenti - mavi (casino'nun bittiği yerden devam)
-    const sportsOffset = circumference - (sportsPercent / 100) * circumference;
-    const sportsRotation = -90 + (casinoPercent / 100) * 360; // Casino'dan sonra başla
-
     const isComplete = percentage >= 100;
+    const total = casinoPercentage + sportsPercentage;
+
+    // Toplam 100'ü geçiyorsa oransal olarak paylaştır
+    let casinoVisual, sportsVisual;
+    if (total > 100) {
+        // Oransal paylaşım - daire tamamen dolu
+        casinoVisual = (casinoPercentage / total) * 100;
+        sportsVisual = (sportsPercentage / total) * 100;
+    } else {
+        // Toplam 100'ün altındaysa direkt göster
+        casinoVisual = casinoPercentage;
+        sportsVisual = sportsPercentage;
+    }
+
+    // Casino segmenti - yeşil (üstten başlar)
+    const casinoLength = (casinoVisual / 100) * circumference;
+    const casinoOffset = circumference - casinoLength;
+
+    // Spor segmenti - mavi (casino'nun bittiği yerden)
+    const sportsLength = (sportsVisual / 100) * circumference;
+    const sportsOffset = circumference - sportsLength;
+    const sportsRotation = -90 + (casinoVisual / 100) * 360;
 
     return (
         <div className="circular-progress" style={{ width: size, height: size }}>
@@ -42,20 +53,19 @@ function CircularProgress({ percentage, casinoPercentage = 0, sportsPercentage =
                     cx={size / 2} cy={size / 2} r={radius}
                     strokeWidth={strokeWidth} fill="none"
                 />
-                {/* Casino segmenti - yeşil */}
-                {casinoPercent > 0 && (
+                {/* Casino segmenti - yeşil (önce çizilir) */}
+                {casinoVisual > 0 && (
                     <circle
                         cx={size / 2} cy={size / 2} r={radius}
                         strokeWidth={strokeWidth} fill="none"
-                        stroke={isComplete ? 'var(--status-approved)' : '#22c55e'}
+                        stroke={isComplete ? '#22c55e' : '#22c55e'}
                         strokeDasharray={circumference}
                         strokeDashoffset={casinoOffset}
                         transform={`rotate(-90 ${size / 2} ${size / 2})`}
-                        strokeLinecap="round"
                     />
                 )}
-                {/* Spor segmenti - mavi */}
-                {sportsPercent > 0 && (
+                {/* Spor segmenti - mavi (casino'dan sonra) */}
+                {sportsVisual > 0 && (
                     <circle
                         cx={size / 2} cy={size / 2} r={radius}
                         strokeWidth={strokeWidth} fill="none"
@@ -63,7 +73,6 @@ function CircularProgress({ percentage, casinoPercentage = 0, sportsPercentage =
                         strokeDasharray={circumference}
                         strokeDashoffset={sportsOffset}
                         transform={`rotate(${sportsRotation} ${size / 2} ${size / 2})`}
-                        strokeLinecap="round"
                     />
                 )}
             </svg>
