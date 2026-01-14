@@ -388,10 +388,42 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Casino Top 5 - SOL KARTA TAŞINDI */}
+                            <div className="sub-section" style={{ marginTop: '16px' }}>
+                                <div className="section-title">
+                                    <Gamepad2 size={16} /> Casino Top 5
+                                    {casinoGames.length > 0 && (
+                                        <span className={`section-total ${casinoGames.reduce((sum, g) => sum + (g.winAmount - g.betAmount), 0) >= 0 ? 'positive' : 'negative'}`}>
+                                            Net: {formatCurrency(casinoGames.reduce((sum, g) => sum + (g.winAmount - g.betAmount), 0))}
+                                        </span>
+                                    )}
+                                </div>
+                                {casinoGames.length === 0 ? (
+                                    <div className="empty-message">Casino oyunu yok</div>
+                                ) : (
+                                    <div className="mini-list">
+                                        {casinoGames.slice(0, 5).map((g, i) => (
+                                            <div key={i} className="mini-item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '2px' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span className="item-name">{g.game}</span>
+                                                    <span className={`item-amount ${g.winAmount > g.betAmount ? 'positive' : 'negative'}`}>
+                                                        {formatCurrency(g.winAmount - g.betAmount)}
+                                                    </span>
+                                                </div>
+                                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', gap: '12px' }}>
+                                                    <span>Bahis: {formatCurrency(g.betAmount)}</span>
+                                                    <span>Kazanç: {formatCurrency(g.winAmount)}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
-                        {/* Middle: Spor + Casino */}
-                        <div className="detail-card middle-card">
+                        {/* Middle: SADECE Spor Kuponları */}
+                        <div className="detail-card middle-card" style={{ display: 'flex', flexDirection: 'column' }}>
                             {/* Spor Kuponları */}
                             <div className="sub-section">
                                 <div className="section-title">
@@ -430,63 +462,102 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                                 {sportsBets.length === 0 ? (
                                     <div className="empty-message">Kupon yok</div>
                                 ) : (
-                                    <div className="mini-list">
-                                        {sportsBets.slice(0, 4).map((bet, i) => (
-                                            <div key={i} className="mini-item sports-item">
-                                                <div className="item-info">
-                                                    {bet.selections && bet.selections.length > 0 ? (
-                                                        <>
-                                                            {bet.selections.length > 1 && (
-                                                                <div className="bet-type-label">Kombine ({bet.selections.length})</div>
-                                                            )}
-                                                            {bet.selections.map((s, idx) => (
-                                                                <div key={idx} className="match-row">
-                                                                    <span className="match-name">{s.matchName}</span>
-                                                                    <span className="selection-outcome"> {s.selectionName}</span>
-                                                                </div>
-                                                            ))}
-                                                        </>
-                                                    ) : (
-                                                        <span className="match-name">
-                                                            {bet.type || `Bahis #${bet.id}`}
+                                    <div style={{
+                                        flex: 1,
+                                        overflowY: 'auto',
+                                        maxHeight: '400px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '8px'
+                                    }}>
+                                        {sportsBets.map((bet, i) => (
+                                            <div key={i} style={{
+                                                background: 'var(--bg-tertiary)',
+                                                border: '1px solid var(--border-subtle)',
+                                                borderRadius: '6px',
+                                                padding: '10px'
+                                            }}>
+                                                {/* Header: Kupon ID + Durum + Oran */}
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>#{bet.id}</span>
+                                                        <span style={{
+                                                            fontSize: '10px',
+                                                            padding: '2px 6px',
+                                                            borderRadius: '4px',
+                                                            fontWeight: 600,
+                                                            background: bet.state === 4 ? 'rgba(34,197,94,0.15)' :
+                                                                bet.state === 2 ? 'rgba(239,68,68,0.15)' :
+                                                                    bet.state === 5 ? 'rgba(245,158,11,0.15)' :
+                                                                        bet.state === 3 ? 'rgba(99,102,241,0.15)' :
+                                                                            'rgba(156,163,175,0.15)',
+                                                            color: bet.state === 4 ? 'var(--status-approved)' :
+                                                                bet.state === 2 ? 'var(--status-rejected)' :
+                                                                    bet.state === 5 ? 'var(--status-pending)' :
+                                                                        bet.state === 3 ? 'var(--accent-primary)' :
+                                                                            'var(--text-muted)'
+                                                        }}>
+                                                            {bet.stateName}
                                                         </span>
-                                                    )}
-                                                </div>
-                                                <span className={`item-amount ${(bet.winningAmount || 0) > 0 ? 'positive' : ''}`}>
-                                                    {formatCurrency(bet.amount)} → {formatCurrency(bet.winningAmount || 0)}
-                                                </span>
-                                            </div>
-                                        ))}
-                                        {sportsBets.length > 4 && <div className="more-indicator">+{sportsBets.length - 4} daha</div>}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Casino Top 5 */}
-                            <div className="sub-section">
-                                <div className="section-title">
-                                    <Gamepad2 size={16} /> Casino Top 5
-                                    {casinoGames.length > 0 && (
-                                        <span className={`section-total ${casinoGames.reduce((sum, g) => sum + (g.winAmount - g.betAmount), 0) >= 0 ? 'positive' : 'negative'}`}>
-                                            Net: {formatCurrency(casinoGames.reduce((sum, g) => sum + (g.winAmount - g.betAmount), 0))}
-                                        </span>
-                                    )}
-                                </div>
-                                {casinoGames.length === 0 ? (
-                                    <div className="empty-message">Casino oyunu yok</div>
-                                ) : (
-                                    <div className="mini-list">
-                                        {casinoGames.slice(0, 5).map((g, i) => (
-                                            <div key={i} className="mini-item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '2px' }}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                    <span className="item-name">{g.game}</span>
-                                                    <span className={`item-amount ${g.winAmount > g.betAmount ? 'positive' : 'negative'}`}>
-                                                        {formatCurrency(g.winAmount - g.betAmount)}
+                                                        {bet.isCashout && <span style={{ fontSize: '10px', color: '#f59e0b' }}>💰 Cashout</span>}
+                                                    </div>
+                                                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--accent-primary)' }}>
+                                                        Oran: {bet.odds?.toFixed(2) || '-'}
                                                     </span>
                                                 </div>
-                                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', gap: '12px' }}>
-                                                    <span>Bahis: {formatCurrency(g.betAmount)}</span>
-                                                    <span>Kazanç: {formatCurrency(g.winAmount)}</span>
+
+                                                {/* Maç Detayları */}
+                                                {bet.selections && bet.selections.length > 0 && (
+                                                    <div style={{ marginBottom: '6px' }}>
+                                                        {bet.selections.length > 1 && (
+                                                            <div style={{ fontSize: '10px', color: 'var(--accent-primary)', fontWeight: 600, marginBottom: '4px' }}>
+                                                                Kombine ({bet.selections.length})
+                                                            </div>
+                                                        )}
+                                                        {bet.selections.slice(0, 3).map((s, idx) => (
+                                                            <div key={idx} style={{
+                                                                fontSize: '11px',
+                                                                color: 'var(--text-primary)',
+                                                                padding: '3px 0',
+                                                                borderBottom: idx < Math.min(bet.selections.length, 3) - 1 ? '1px solid var(--border-subtle)' : 'none'
+                                                            }}>
+                                                                <div style={{ fontWeight: 500 }}>{s.matchName}</div>
+                                                                <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                                                                    {s.marketName}: <span style={{ color: 'var(--accent-primary)' }}>{s.selectionName}</span>
+                                                                    {s.odds && <span style={{ marginLeft: '6px' }}>@{s.odds?.toFixed(2)}</span>}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                        {bet.selections.length > 3 && (
+                                                            <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                                                +{bet.selections.length - 3} daha...
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Footer: Bahis → Kazanç */}
+                                                <div style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    paddingTop: '6px',
+                                                    borderTop: '1px solid var(--border-subtle)',
+                                                    fontSize: '12px',
+                                                    fontWeight: 600
+                                                }}>
+                                                    <span style={{ color: 'var(--text-muted)' }}>
+                                                        Bahis: {formatCurrency(bet.amount)}
+                                                    </span>
+                                                    <span style={{
+                                                        color: (bet.winningAmount || 0) > 0 ? 'var(--status-approved)' :
+                                                            bet.state === 2 ? 'var(--status-rejected)' : 'var(--text-muted)'
+                                                    }}>
+                                                        {(bet.winningAmount || 0) > 0 ? `+${formatCurrency(bet.winningAmount)}` :
+                                                            bet.state === 2 ? `Kaybetti` :
+                                                                bet.state === 1 ? `Olası: ${formatCurrency(bet.possibleWin)}` :
+                                                                    formatCurrency(bet.winningAmount || 0)}
+                                                    </span>
                                                 </div>
                                             </div>
                                         ))}
