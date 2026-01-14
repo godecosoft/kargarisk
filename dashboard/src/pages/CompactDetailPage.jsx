@@ -435,27 +435,107 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
 
                         {/* Right: IP + Bonuslar */}
                         <div className="detail-card right-card">
-                            {/* IP Kontrolü */}
+                            {/* IP Kontrolü - GELİŞTİRİLMİŞ */}
                             <div className="sub-section">
                                 <div className="section-title">
                                     <Wifi size={16} /> IP Kontrolü
                                     {ipAnalysis?.hasMultiAccount && (
-                                        <AlertTriangle size={14} className="warning-icon" />
+                                        <span style={{
+                                            marginLeft: 'auto',
+                                            fontSize: '10px',
+                                            background: 'rgba(239, 68, 68, 0.15)',
+                                            color: 'var(--status-rejected)',
+                                            padding: '2px 8px',
+                                            borderRadius: '10px',
+                                            fontWeight: 600
+                                        }}>
+                                            ⚠️ Çoklu Hesap Tespit Edildi
+                                        </span>
                                     )}
                                 </div>
+
+                                {/* Özet İstatistikler */}
+                                {ipAnalysis?.analysis?.length > 0 && (
+                                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                                        <div style={{ flex: 1, background: 'var(--bg-tertiary)', borderRadius: '6px', padding: '8px', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                                {ipAnalysis.analysis.reduce((sum, ip) => sum + (ip.loginCount || 0), 0)}
+                                            </div>
+                                            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Toplam Giriş</div>
+                                        </div>
+                                        <div style={{ flex: 1, background: 'var(--bg-tertiary)', borderRadius: '6px', padding: '8px', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                                {ipAnalysis.analysis.length}
+                                            </div>
+                                            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Farklı IP</div>
+                                        </div>
+                                        <div style={{
+                                            flex: 1,
+                                            background: ipAnalysis.hasMultiAccount ? 'rgba(239, 68, 68, 0.15)' : 'var(--bg-tertiary)',
+                                            borderRadius: '6px',
+                                            padding: '8px',
+                                            textAlign: 'center',
+                                            border: ipAnalysis.hasMultiAccount ? '1px solid rgba(239, 68, 68, 0.3)' : 'none'
+                                        }}>
+                                            <div style={{
+                                                fontSize: '16px',
+                                                fontWeight: 700,
+                                                color: ipAnalysis.hasMultiAccount ? 'var(--status-rejected)' : 'var(--text-primary)'
+                                            }}>
+                                                {ipAnalysis.analysis.reduce((sum, ip) => sum + (ip.otherAccounts?.length || 0), 0)}
+                                            </div>
+                                            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Diğer Hesaplar</div>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {!ipAnalysis?.analysis?.length ? (
                                     <div className="empty-message">IP kaydı yok</div>
                                 ) : (
-                                    <div className="ip-list">
-                                        {ipAnalysis.analysis.slice(0, 3).map((ip, i) => (
-                                            <div key={i} className={`ip-item ${ip.otherAccounts?.length > 0 ? 'warning' : ''}`}>
-                                                <div className="ip-main">
-                                                    <span className="ip-address">{ip.ip}</span>
-                                                    <span className="ip-info">{ip.loginCount} giriş</span>
+                                    <div className="ip-list" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                        {ipAnalysis.analysis.slice(0, 4).map((ip, i) => (
+                                            <div key={i} style={{
+                                                background: ip.otherAccounts?.length > 0 ? 'rgba(239, 68, 68, 0.08)' : 'var(--bg-tertiary)',
+                                                border: ip.otherAccounts?.length > 0 ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid var(--border-subtle)',
+                                                borderRadius: '6px',
+                                                padding: '8px 10px'
+                                            }}>
+                                                {/* IP Header */}
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ fontWeight: 600, fontSize: '12px', color: 'var(--text-primary)' }}>{ip.ip}</span>
+                                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ip.loginCount} giriş</span>
                                                 </div>
+                                                {/* Diğer Hesaplar */}
                                                 {ip.otherAccounts?.length > 0 && (
-                                                    <div className="other-accounts">
-                                                        ⚠️ Diğer hesaplar: {ip.otherAccounts.map(acc => acc.Login || acc.login).join(', ')}
+                                                    <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                                                        <div style={{ fontSize: '10px', color: 'var(--status-rejected)', marginBottom: '4px', fontWeight: 500 }}>
+                                                            ⚠️ Bu IP'yi kullanan diğer hesaplar:
+                                                        </div>
+                                                        {ip.otherAccounts.slice(0, 2).map((acc, idx) => (
+                                                            <div key={idx} style={{
+                                                                display: 'flex',
+                                                                justifyContent: 'space-between',
+                                                                fontSize: '10px',
+                                                                padding: '3px 6px',
+                                                                background: 'rgba(239, 68, 68, 0.1)',
+                                                                borderRadius: '4px',
+                                                                marginBottom: '3px'
+                                                            }}>
+                                                                <span style={{ fontWeight: 500 }}>{acc.Login || acc.login}</span>
+                                                                <span style={{ color: 'var(--text-muted)' }}>
+                                                                    ID: {acc.ClientId || acc.clientId} •
+                                                                    {acc.LoginCount || acc.loginCount || 1} giriş
+                                                                    {(acc.RegistrationDate || acc.registrationDate) && (
+                                                                        <> • Kayıt: {new Date(acc.RegistrationDate || acc.registrationDate).toLocaleDateString('tr-TR')}</>
+                                                                    )}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                        {ip.otherAccounts.length > 2 && (
+                                                            <div style={{ fontSize: '9px', color: 'var(--text-muted)', textAlign: 'right' }}>
+                                                                +{ip.otherAccounts.length - 2} daha
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
