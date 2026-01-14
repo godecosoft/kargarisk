@@ -245,7 +245,15 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                                 <span className="kpi-value">{clientDetails.isVerified ? '✓ Onaylı' : '✗ Onaysız'}</span>
                             </div>
                             {clientDetails.birthDate && (
-                                <div className="kpi-stat">
+                                <div className="kpi-stat" style={{
+                                    border: clientDetails.age >= 60 ? '1px solid var(--status-rejected)' :
+                                        clientDetails.age >= 55 ? '1px solid var(--status-pending)' : '1px solid transparent',
+                                    background: clientDetails.age >= 60 ? 'rgba(239, 68, 68, 0.1)' :
+                                        clientDetails.age >= 55 ? 'rgba(245, 158, 11, 0.1)' : 'transparent',
+                                    borderRadius: '6px',
+                                    paddingRight: '12px',
+                                    paddingLeft: '12px'
+                                }}>
                                     <span className="kpi-label">Yaş</span>
                                     <span className="kpi-value" style={{
                                         color: clientDetails.age >= 60 ? 'var(--status-rejected)' :
