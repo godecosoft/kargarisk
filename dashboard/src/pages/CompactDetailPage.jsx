@@ -346,6 +346,31 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                                         </span>
                                     )}
                                 </div>
+
+                                {/* PRE-DEPOSIT UYARI */}
+                                {sports?.hasPreDepositWinning && sports?.preDepositWinningBet && (
+                                    <div style={{
+                                        background: 'rgba(245, 158, 11, 0.15)',
+                                        border: '1px solid rgba(245, 158, 11, 0.4)',
+                                        borderRadius: '6px',
+                                        padding: '8px 10px',
+                                        marginBottom: '8px'
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                                            <AlertTriangle size={14} color="#f59e0b" />
+                                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#f59e0b' }}>
+                                                Yatırımdan Önce Oluşturulan Kupon
+                                            </span>
+                                        </div>
+                                        <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                                            Bahis: {formatCurrency(sports.preDepositWinningBet.amount)} → Kazanç: {formatCurrency(sports.preDepositWinningBet.winningAmount)}
+                                            <span style={{ marginLeft: '8px', opacity: 0.7 }}>
+                                                {formatTime(sports.preDepositWinningBet.createdAt)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {sportsBets.length === 0 ? (
                                     <div className="empty-message">Kupon yok</div>
                                 ) : (
@@ -459,8 +484,8 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                                                         <div style={{ fontWeight: 600, fontSize: '12px', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                             {b.name}
                                                         </div>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px' }}>
-                                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{b.typeName}</span>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px', flexWrap: 'wrap' }}>
+                                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{b.typeName} • {formatTime(b.createdAt)}</span>
                                                             <span style={{
                                                                 padding: '1px 6px', borderRadius: '8px', fontSize: '9px', fontWeight: 600,
                                                                 background: b.acceptanceType === 2 ? 'rgba(34,197,94,0.15)' : 'rgba(234,179,8,0.15)',
