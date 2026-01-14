@@ -14,30 +14,58 @@ import {
     fetchIPAnalysis, fetchBonusTransactions
 } from '../services/api';
 
-// Circular Progress Component
-function CircularProgress({ percentage, size = 120 }) {
+// Circular Progress Component - Casino (yeşil) + Spor (mavi)
+function CircularProgress({ percentage, casinoPercentage = 0, sportsPercentage = 0, size = 120 }) {
     const strokeWidth = 8;
     const radius = (size - strokeWidth) / 2;
     const circumference = radius * 2 * Math.PI;
-    const offset = circumference - (Math.min(percentage, 100) / 100) * circumference;
+
+    // Her iki yüzdeyi max 100'e sınırla (görsel amaçlı)
+    const casinoPercent = Math.min(casinoPercentage, 100);
+    const sportsPercent = Math.min(sportsPercentage, 100);
+
+    // Casino segmenti - yeşil (başlangıç: -90 derece, yani üst)
+    const casinoOffset = circumference - (casinoPercent / 100) * circumference;
+
+    // Spor segmenti - mavi (casino'nun bittiği yerden devam)
+    const sportsOffset = circumference - (sportsPercent / 100) * circumference;
+    const sportsRotation = -90 + (casinoPercent / 100) * 360; // Casino'dan sonra başla
+
     const isComplete = percentage >= 100;
 
     return (
         <div className="circular-progress" style={{ width: size, height: size }}>
             <svg width={size} height={size}>
+                {/* Arka plan dairesi */}
                 <circle
                     className="progress-bg"
                     cx={size / 2} cy={size / 2} r={radius}
                     strokeWidth={strokeWidth} fill="none"
                 />
-                <circle
-                    className={`progress-bar ${isComplete ? 'complete' : 'incomplete'}`}
-                    cx={size / 2} cy={size / 2} r={radius}
-                    strokeWidth={strokeWidth} fill="none"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={offset}
-                    transform={`rotate(-90 ${size / 2} ${size / 2})`}
-                />
+                {/* Casino segmenti - yeşil */}
+                {casinoPercent > 0 && (
+                    <circle
+                        cx={size / 2} cy={size / 2} r={radius}
+                        strokeWidth={strokeWidth} fill="none"
+                        stroke={isComplete ? 'var(--status-approved)' : '#22c55e'}
+                        strokeDasharray={circumference}
+                        strokeDashoffset={casinoOffset}
+                        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+                        strokeLinecap="round"
+                    />
+                )}
+                {/* Spor segmenti - mavi */}
+                {sportsPercent > 0 && (
+                    <circle
+                        cx={size / 2} cy={size / 2} r={radius}
+                        strokeWidth={strokeWidth} fill="none"
+                        stroke="#3b82f6"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={sportsOffset}
+                        transform={`rotate(${sportsRotation} ${size / 2} ${size / 2})`}
+                        strokeLinecap="round"
+                    />
+                )}
             </svg>
             <div className="progress-text">
                 <span className="percentage">{percentage}%</span>
@@ -310,7 +338,11 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                         <div className="detail-card turnover-card">
                             <div className="card-title">Çevrim Durumu</div>
                             <div className="turnover-content">
-                                <CircularProgress percentage={totalPercentage} />
+                                <CircularProgress
+                                    percentage={totalPercentage}
+                                    casinoPercentage={turnover?.turnover?.casino?.percentage || 0}
+                                    sportsPercentage={turnover?.turnover?.sports?.percentage || 0}
+                                />
                                 <div className="turnover-stats">
                                     <div className="stat-row">
                                         <span>
