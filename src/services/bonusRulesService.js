@@ -42,7 +42,10 @@ const bonusRulesService = {
             name, match_keyword, max_amount, ignore_deposit_rule, auto_approval_enabled,
             turnover_multiplier, min_withdrawal_multiplier, max_withdrawal_multiplier,
             min_balance_limit, fixed_withdrawal_amount, max_remaining_balance,
-            require_deposit_id, delete_excess_balance
+            require_deposit_id, delete_excess_balance,
+            max_amount_enabled, turnover_multiplier_enabled, min_withdrawal_multiplier_enabled,
+            max_withdrawal_multiplier_enabled, min_balance_limit_enabled,
+            fixed_withdrawal_amount_enabled, max_remaining_balance_enabled
         } = ruleData;
 
         try {
@@ -51,8 +54,11 @@ const bonusRulesService = {
                 (name, match_keyword, max_amount, ignore_deposit_rule, auto_approval_enabled, 
                  turnover_multiplier, min_withdrawal_multiplier, max_withdrawal_multiplier,
                  min_balance_limit, fixed_withdrawal_amount, max_remaining_balance,
-                 require_deposit_id, delete_excess_balance, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, true)
+                 require_deposit_id, delete_excess_balance, is_active,
+                 max_amount_enabled, turnover_multiplier_enabled, min_withdrawal_multiplier_enabled,
+                 max_withdrawal_multiplier_enabled, min_balance_limit_enabled,
+                 fixed_withdrawal_amount_enabled, max_remaining_balance_enabled)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, true, ?, ?, ?, ?, ?, ?, ?)
             `;
             const result = await db.query(sql, [
                 name,
@@ -67,7 +73,14 @@ const bonusRulesService = {
                 fixed_withdrawal_amount || 0,
                 max_remaining_balance || 0,
                 require_deposit_id || false,
-                delete_excess_balance || false
+                delete_excess_balance || false,
+                max_amount_enabled || false,
+                turnover_multiplier_enabled || false,
+                min_withdrawal_multiplier_enabled || false,
+                max_withdrawal_multiplier_enabled || false,
+                min_balance_limit_enabled || false,
+                fixed_withdrawal_amount_enabled || false,
+                max_remaining_balance_enabled || false
             ]);
             return result.insertId;
         } catch (error) {
@@ -102,6 +115,15 @@ const bonusRulesService = {
             if (updates.max_remaining_balance !== undefined) { fields.push('max_remaining_balance = ?'); values.push(updates.max_remaining_balance); }
             if (updates.require_deposit_id !== undefined) { fields.push('require_deposit_id = ?'); values.push(updates.require_deposit_id); }
             if (updates.delete_excess_balance !== undefined) { fields.push('delete_excess_balance = ?'); values.push(updates.delete_excess_balance); }
+
+            // Enabled flags for each numeric field
+            if (updates.max_amount_enabled !== undefined) { fields.push('max_amount_enabled = ?'); values.push(updates.max_amount_enabled); }
+            if (updates.turnover_multiplier_enabled !== undefined) { fields.push('turnover_multiplier_enabled = ?'); values.push(updates.turnover_multiplier_enabled); }
+            if (updates.min_withdrawal_multiplier_enabled !== undefined) { fields.push('min_withdrawal_multiplier_enabled = ?'); values.push(updates.min_withdrawal_multiplier_enabled); }
+            if (updates.max_withdrawal_multiplier_enabled !== undefined) { fields.push('max_withdrawal_multiplier_enabled = ?'); values.push(updates.max_withdrawal_multiplier_enabled); }
+            if (updates.min_balance_limit_enabled !== undefined) { fields.push('min_balance_limit_enabled = ?'); values.push(updates.min_balance_limit_enabled); }
+            if (updates.fixed_withdrawal_amount_enabled !== undefined) { fields.push('fixed_withdrawal_amount_enabled = ?'); values.push(updates.fixed_withdrawal_amount_enabled); }
+            if (updates.max_remaining_balance_enabled !== undefined) { fields.push('max_remaining_balance_enabled = ?'); values.push(updates.max_remaining_balance_enabled); }
 
             if (fields.length === 0) return false;
 

@@ -233,8 +233,25 @@ async function runMigrations() {
                 ADD COLUMN max_withdrawal_multiplier DECIMAL(5,2) DEFAULT 0
             `);
         } catch (e) {
-            // Ignore "Duplicate column name" error (Code: 1060)
             if (e.errno !== 1060) console.error('[DB] Column update error:', e.message);
+        }
+
+        // Add enabled flags for each numeric field
+        const enabledFlags = [
+            'max_amount_enabled',
+            'turnover_multiplier_enabled',
+            'min_withdrawal_multiplier_enabled',
+            'max_withdrawal_multiplier_enabled',
+            'min_balance_limit_enabled',
+            'fixed_withdrawal_amount_enabled',
+            'max_remaining_balance_enabled'
+        ];
+        for (const flag of enabledFlags) {
+            try {
+                await pool.query(`ALTER TABLE bonus_rules ADD COLUMN ${flag} BOOLEAN DEFAULT FALSE`);
+            } catch (e) {
+                if (e.errno !== 1060) console.error('[DB] Column add error:', e.message);
+            }
         }
 
         console.log('[DB] Migrations completed - all tables ready including auto_approvals');

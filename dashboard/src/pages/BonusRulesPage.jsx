@@ -22,7 +22,15 @@ export default function BonusRulesPage() {
         fixed_withdrawal_amount: 0,
         max_remaining_balance: 0,
         require_deposit_id: false,
-        delete_excess_balance: false
+        delete_excess_balance: false,
+        // Enabled flags for each numeric field
+        max_amount_enabled: false,
+        turnover_multiplier_enabled: false,
+        min_withdrawal_multiplier_enabled: false,
+        max_withdrawal_multiplier_enabled: false,
+        min_balance_limit_enabled: false,
+        fixed_withdrawal_amount_enabled: false,
+        max_remaining_balance_enabled: false
     });
 
     const resetFormData = () => ({
@@ -37,7 +45,14 @@ export default function BonusRulesPage() {
         fixed_withdrawal_amount: 0,
         max_remaining_balance: 0,
         require_deposit_id: false,
-        delete_excess_balance: false
+        delete_excess_balance: false,
+        max_amount_enabled: false,
+        turnover_multiplier_enabled: false,
+        min_withdrawal_multiplier_enabled: false,
+        max_withdrawal_multiplier_enabled: false,
+        min_balance_limit_enabled: false,
+        fixed_withdrawal_amount_enabled: false,
+        max_remaining_balance_enabled: false
     });
 
     useEffect(() => {
@@ -113,7 +128,15 @@ export default function BonusRulesPage() {
             fixed_withdrawal_amount: rule.fixed_withdrawal_amount || 0,
             max_remaining_balance: rule.max_remaining_balance || 0,
             require_deposit_id: Boolean(rule.require_deposit_id),
-            delete_excess_balance: Boolean(rule.delete_excess_balance)
+            delete_excess_balance: Boolean(rule.delete_excess_balance),
+            // Enabled flags
+            max_amount_enabled: Boolean(rule.max_amount_enabled),
+            turnover_multiplier_enabled: Boolean(rule.turnover_multiplier_enabled),
+            min_withdrawal_multiplier_enabled: Boolean(rule.min_withdrawal_multiplier_enabled),
+            max_withdrawal_multiplier_enabled: Boolean(rule.max_withdrawal_multiplier_enabled),
+            min_balance_limit_enabled: Boolean(rule.min_balance_limit_enabled),
+            fixed_withdrawal_amount_enabled: Boolean(rule.fixed_withdrawal_amount_enabled),
+            max_remaining_balance_enabled: Boolean(rule.max_remaining_balance_enabled)
         });
         setShowAddModal(true);
     };
@@ -272,79 +295,173 @@ export default function BonusRulesPage() {
                                     onChange={e => setFormData({ ...formData, name: e.target.value })}
                                 />
                             </div>
-                            <div className="form-group">
-                                <label>Maksimum Çekim Tutarı (TL) - Sabit Limit</label>
+
+                            {/* Max Çekim Tutarı - Toggle'lı */}
+                            <div className="form-group-toggle">
+                                <div className="toggle-header">
+                                    <label>Maksimum Çekim Tutarı (TL)</label>
+                                    <label className="toggle-switch small">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.max_amount_enabled}
+                                            onChange={e => setFormData({ ...formData, max_amount_enabled: e.target.checked })}
+                                        />
+                                        <span className="slider"></span>
+                                    </label>
+                                </div>
                                 <input
                                     type="number"
+                                    placeholder="Örn: 5000"
                                     value={formData.max_amount}
                                     onChange={e => setFormData({ ...formData, max_amount: e.target.value })}
+                                    disabled={!formData.max_amount_enabled}
+                                    className={!formData.max_amount_enabled ? 'disabled' : ''}
                                 />
+                                <small>Sabit maksimum çekim limiti</small>
                             </div>
 
                             <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                <div className="form-group">
-                                    <label>Çevrim Şartı (Katı)</label>
+                                {/* Çevrim Şartı - Toggle'lı */}
+                                <div className="form-group-toggle">
+                                    <div className="toggle-header">
+                                        <label>Çevrim Şartı (Katı)</label>
+                                        <label className="toggle-switch small">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.turnover_multiplier_enabled}
+                                                onChange={e => setFormData({ ...formData, turnover_multiplier_enabled: e.target.checked })}
+                                            />
+                                            <span className="slider"></span>
+                                        </label>
+                                    </div>
                                     <input
                                         type="number"
                                         placeholder="Örn: 10"
                                         value={formData.turnover_multiplier}
                                         onChange={e => setFormData({ ...formData, turnover_multiplier: e.target.value })}
+                                        disabled={!formData.turnover_multiplier_enabled}
+                                        className={!formData.turnover_multiplier_enabled ? 'disabled' : ''}
                                     />
-                                    <small>Yatırımın kaç katı çevrim gerekli?</small>
+                                    <small>Yatırımın kaç katı çevrim?</small>
                                 </div>
-                                <div className="form-group">
-                                    <label>Max Çekim (Yatırım Katı)</label>
+                                {/* Max Çekim Katı - Toggle'lı */}
+                                <div className="form-group-toggle">
+                                    <div className="toggle-header">
+                                        <label>Max Çekim (Yatırım Katı)</label>
+                                        <label className="toggle-switch small">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.max_withdrawal_multiplier_enabled}
+                                                onChange={e => setFormData({ ...formData, max_withdrawal_multiplier_enabled: e.target.checked })}
+                                            />
+                                            <span className="slider"></span>
+                                        </label>
+                                    </div>
                                     <input
                                         type="number"
                                         placeholder="Örn: 10"
                                         value={formData.max_withdrawal_multiplier}
                                         onChange={e => setFormData({ ...formData, max_withdrawal_multiplier: e.target.value })}
+                                        disabled={!formData.max_withdrawal_multiplier_enabled}
+                                        className={!formData.max_withdrawal_multiplier_enabled ? 'disabled' : ''}
                                     />
-                                    <small>Yatırımın en fazla kaç katı çekilebilir?</small>
+                                    <small>Yatırımın max kaç katı çekilebilir?</small>
                                 </div>
                             </div>
 
                             <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                <div className="form-group">
-                                    <label>Min Çekim (Yatırım Katı)</label>
+                                {/* Min Çekim Katı - Toggle'lı */}
+                                <div className="form-group-toggle">
+                                    <div className="toggle-header">
+                                        <label>Min Çekim (Yatırım Katı)</label>
+                                        <label className="toggle-switch small">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.min_withdrawal_multiplier_enabled}
+                                                onChange={e => setFormData({ ...formData, min_withdrawal_multiplier_enabled: e.target.checked })}
+                                            />
+                                            <span className="slider"></span>
+                                        </label>
+                                    </div>
                                     <input
                                         type="number"
                                         placeholder="Örn: 5"
                                         value={formData.min_withdrawal_multiplier}
                                         onChange={e => setFormData({ ...formData, min_withdrawal_multiplier: e.target.value })}
+                                        disabled={!formData.min_withdrawal_multiplier_enabled}
+                                        className={!formData.min_withdrawal_multiplier_enabled ? 'disabled' : ''}
                                     />
                                     <small>Yatırımın en az kaç katı çekilmeli?</small>
                                 </div>
-                                <div className="form-group">
-                                    <label>Minimum Bakiye Şartı (₺)</label>
+                                {/* Min Bakiye Şartı - Toggle'lı */}
+                                <div className="form-group-toggle">
+                                    <div className="toggle-header">
+                                        <label>Minimum Bakiye Şartı (₺)</label>
+                                        <label className="toggle-switch small">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.min_balance_limit_enabled}
+                                                onChange={e => setFormData({ ...formData, min_balance_limit_enabled: e.target.checked })}
+                                            />
+                                            <span className="slider"></span>
+                                        </label>
+                                    </div>
                                     <input
                                         type="number"
                                         placeholder="Örn: 15000"
                                         value={formData.min_balance_limit}
                                         onChange={e => setFormData({ ...formData, min_balance_limit: e.target.value })}
+                                        disabled={!formData.min_balance_limit_enabled}
+                                        className={!formData.min_balance_limit_enabled ? 'disabled' : ''}
                                     />
                                     <small>Çekim için ulaşılması gereken bakiye</small>
                                 </div>
                             </div>
 
                             <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                <div className="form-group">
-                                    <label>Sabit Çekim Tutarı (₺)</label>
+                                {/* Sabit Çekim - Toggle'lı */}
+                                <div className="form-group-toggle">
+                                    <div className="toggle-header">
+                                        <label>Sabit Çekim Tutarı (₺)</label>
+                                        <label className="toggle-switch small">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.fixed_withdrawal_amount_enabled}
+                                                onChange={e => setFormData({ ...formData, fixed_withdrawal_amount_enabled: e.target.checked })}
+                                            />
+                                            <span className="slider"></span>
+                                        </label>
+                                    </div>
                                     <input
                                         type="number"
                                         placeholder="Örn: 1000"
                                         value={formData.fixed_withdrawal_amount}
                                         onChange={e => setFormData({ ...formData, fixed_withdrawal_amount: e.target.value })}
+                                        disabled={!formData.fixed_withdrawal_amount_enabled}
+                                        className={!formData.fixed_withdrawal_amount_enabled ? 'disabled' : ''}
                                     />
-                                    <small>Sabit çekim limiti (0 = yok)</small>
+                                    <small>Sabit çekim limiti</small>
                                 </div>
-                                <div className="form-group">
-                                    <label>Max İçeride Bırakılabilir Bakiye (₺)</label>
+                                {/* Max Bırakılabilir Bakiye - Toggle'lı */}
+                                <div className="form-group-toggle">
+                                    <div className="toggle-header">
+                                        <label>Max İçeride Bırakılabilir (₺)</label>
+                                        <label className="toggle-switch small">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.max_remaining_balance_enabled}
+                                                onChange={e => setFormData({ ...formData, max_remaining_balance_enabled: e.target.checked })}
+                                            />
+                                            <span className="slider"></span>
+                                        </label>
+                                    </div>
                                     <input
                                         type="number"
                                         placeholder="Örn: 3"
                                         value={formData.max_remaining_balance}
                                         onChange={e => setFormData({ ...formData, max_remaining_balance: e.target.value })}
+                                        disabled={!formData.max_remaining_balance_enabled}
+                                        className={!formData.max_remaining_balance_enabled ? 'disabled' : ''}
                                     />
                                     <small>0 = tüm bakiye çekilmeli</small>
                                 </div>
@@ -436,13 +553,24 @@ export default function BonusRulesPage() {
 
                 /* Toggle Switch */
                 .toggle-switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+                .toggle-switch.small { width: 32px; height: 18px; }
                 .toggle-switch input { opacity: 0; width: 0; height: 0; }
                 .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--bg-tertiary); transition: .4s; border-radius: 20px; }
                 .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
+                .toggle-switch.small .slider:before { height: 14px; width: 14px; }
                 input:checked + .slider { background-color: var(--brand-primary); }
                 input:checked + .slider:before { transform: translateX(16px); }
+                .toggle-switch.small input:checked + .slider:before { transform: translateX(14px); }
                 .toggle-switch.warning input:checked + .slider { background-color: #f59e0b; }
                 .warning-row { background: rgba(245, 158, 11, 0.1); padding: 4px 8px; border-radius: 6px; margin-top: 4px; }
+
+                /* Toggle'lı Form Alanları */
+                .form-group-toggle { margin-bottom: 16px; }
+                .form-group-toggle .toggle-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+                .form-group-toggle .toggle-header label:first-child { font-size: 13px; color: var(--text-secondary); }
+                .form-group-toggle input[type="number"] { width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); color: var(--text-primary); }
+                .form-group-toggle input[type="number"].disabled { opacity: 0.4; cursor: not-allowed; background: var(--bg-secondary); }
+                .form-group-toggle small { display: block; margin-top: 4px; font-size: 11px; opacity: 0.7; }
 
                 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; }
                 .modal-content { background: var(--bg-card); padding: 24px; border-radius: var(--radius-lg); width: 100%; max-width: 500px; border: 1px solid var(--border-subtle); }
