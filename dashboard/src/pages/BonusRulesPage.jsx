@@ -12,7 +12,6 @@ export default function BonusRulesPage() {
     // Form state
     const [formData, setFormData] = useState({
         name: '',
-        match_keyword: '',
         max_amount: 0,
         ignore_deposit_rule: false,
         auto_approval_enabled: false,
@@ -28,7 +27,6 @@ export default function BonusRulesPage() {
 
     const resetFormData = () => ({
         name: '',
-        match_keyword: '',
         max_amount: 0,
         ignore_deposit_rule: false,
         auto_approval_enabled: false,
@@ -60,15 +58,26 @@ export default function BonusRulesPage() {
 
     const handleSave = async () => {
         try {
-            if (!formData.name || !formData.match_keyword) {
-                alert('İsim ve Eşleşme Kelimesi zorunludur!');
+            if (!formData.name) {
+                alert('Kural adı zorunludur!');
                 return;
             }
 
+            // match_keyword'ü isimden otomatik oluştur (Türkçe karakterler çevrilir)
+            const autoKeyword = formData.name
+                .toUpperCase()
+                .replace(/Ğ/g, 'G').replace(/Ü/g, 'U').replace(/Ş/g, 'S')
+                .replace(/İ/g, 'I').replace(/Ö/g, 'O').replace(/Ç/g, 'C')
+                .replace(/[^A-Z0-9]/g, '_')
+                .replace(/_+/g, '_')
+                .replace(/^_|_$/g, '');
+
+            const dataToSend = { ...formData, match_keyword: autoKeyword };
+
             if (editingRule) {
-                await updateBonusRule(editingRule.id, formData);
+                await updateBonusRule(editingRule.id, dataToSend);
             } else {
-                await addBonusRule(formData);
+                await addBonusRule(dataToSend);
             }
 
             setShowAddModal(false);
@@ -94,7 +103,6 @@ export default function BonusRulesPage() {
         setEditingRule(rule);
         setFormData({
             name: rule.name,
-            match_keyword: rule.match_keyword,
             max_amount: rule.max_amount || 0,
             ignore_deposit_rule: Boolean(rule.ignore_deposit_rule),
             auto_approval_enabled: Boolean(rule.auto_approval_enabled),
@@ -156,7 +164,6 @@ export default function BonusRulesPage() {
                                     </div>
                                     <div className="rule-info">
                                         <div className="rule-name">{rule.name}</div>
-                                        <div className="rule-keyword">Anahtar: <span>{rule.match_keyword}</span></div>
                                     </div>
                                     <div className="rule-actions">
                                         <button className="icon-btn edit" onClick={() => openEdit(rule)}>
@@ -185,12 +192,6 @@ export default function BonusRulesPage() {
                                             <span className="setting-value">{rule.turnover_multiplier} Katı</span>
                                         </div>
                                     )}
-                                    <div className="setting-row">
-                                        <span className="setting-label"><ShieldAlert size={12} /> Yatırım Şartı:</span>
-                                        <span className={`setting-value ${rule.ignore_deposit_rule ? 'success' : 'warning'}`}>
-                                            {rule.ignore_deposit_rule ? 'YOKSAY' : 'ZORUNLU'}
-                                        </span>
-                                    </div>
                                     <div className="setting-row switch-row">
                                         <span className="setting-label">Kural Aktif</span>
                                         <label className="toggle-switch">
@@ -209,6 +210,39 @@ export default function BonusRulesPage() {
                                                 type="checkbox"
                                                 checked={rule.auto_approval_enabled}
                                                 onChange={() => toggleStatus(rule, 'auto_approval_enabled')}
+                                            />
+                                            <span className="slider"></span>
+                                        </label>
+                                    </div>
+                                    <div className="setting-row switch-row">
+                                        <span className="setting-label"><ShieldAlert size={12} /> Yatırım Şartı Yoksay</span>
+                                        <label className="toggle-switch">
+                                            <input
+                                                type="checkbox"
+                                                checked={rule.ignore_deposit_rule}
+                                                onChange={() => toggleStatus(rule, 'ignore_deposit_rule')}
+                                            />
+                                            <span className="slider"></span>
+                                        </label>
+                                    </div>
+                                    <div className="setting-row switch-row">
+                                        <span className="setting-label">Yatırım ID Kontrolü</span>
+                                        <label className="toggle-switch">
+                                            <input
+                                                type="checkbox"
+                                                checked={rule.require_deposit_id}
+                                                onChange={() => toggleStatus(rule, 'require_deposit_id')}
+                                            />
+                                            <span className="slider"></span>
+                                        </label>
+                                    </div>
+                                    <div className="setting-row switch-row warning-row">
+                                        <span className="setting-label"><AlertTriangle size={12} /> Bakiye Silme</span>
+                                        <label className="toggle-switch warning">
+                                            <input
+                                                type="checkbox"
+                                                checked={rule.delete_excess_balance}
+                                                onChange={() => toggleStatus(rule, 'delete_excess_balance')}
                                             />
                                             <span className="slider"></span>
                                         </label>
@@ -237,17 +271,6 @@ export default function BonusRulesPage() {
                                     value={formData.name}
                                     onChange={e => setFormData({ ...formData, name: e.target.value })}
                                 />
-                            </div>
-                            <div className="form-group">
-                                <label>Eşleşme Anahtar Kelimesi (Benzersiz)</label>
-                                <input
-                                    type="text"
-                                    placeholder="Örn: DENEME500 (Oyun/Açıklama içinde aranır)"
-                                    value={formData.match_keyword}
-                                    onChange={e => setFormData({ ...formData, match_keyword: e.target.value })}
-                                    disabled={!!editingRule} // Prevent changing key as it's unique
-                                />
-                                <small>Not: Bu kelime bonus açıklamasında, oyun adında veya ödeme yönteminde geçiyorsa kural devreye girer.</small>
                             </div>
                             <div className="form-group">
                                 <label>Maksimum Çekim Tutarı (TL) - Sabit Limit</label>
@@ -418,6 +441,8 @@ export default function BonusRulesPage() {
                 .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
                 input:checked + .slider { background-color: var(--brand-primary); }
                 input:checked + .slider:before { transform: translateX(16px); }
+                .toggle-switch.warning input:checked + .slider { background-color: #f59e0b; }
+                .warning-row { background: rgba(245, 158, 11, 0.1); padding: 4px 8px; border-radius: 6px; margin-top: 4px; }
 
                 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; }
                 .modal-content { background: var(--bg-card); padding: 24px; border-radius: var(--radius-lg); width: 100%; max-width: 500px; border: 1px solid var(--border-subtle); }
