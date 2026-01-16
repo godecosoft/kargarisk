@@ -154,6 +154,16 @@ async function createSnapshot(withdrawal) {
                 autoApprovalResult = await autoApprovalService.processAutoApproval(withdrawal, snapshotData);
                 logger.info(`[SnapshotService] Auto-approval result for ${withdrawalId}:`, JSON.stringify(autoApprovalResult));
 
+                // Save rule evaluation details to decisionData for Decision Summary display
+                turnoverRes.decisionData = turnoverRes.decisionData || {};
+                turnoverRes.decisionData.ruleEvaluation = {
+                    approved: autoApprovalResult.approved,
+                    reason: autoApprovalResult.reason,
+                    passedRules: autoApprovalResult.ruleResult?.passedRules || [],
+                    failedRules: autoApprovalResult.ruleResult?.failedRules || [],
+                    matchedBonusRule: autoApprovalResult.matchedBonusRule?.name || null
+                };
+
                 // CRITICAL: Update botDecision based on rule engine result
                 if (!autoApprovalResult.approved) {
                     botDecision = 'MANUEL';
@@ -164,7 +174,28 @@ async function createSnapshot(withdrawal) {
                 logger.error(`[SnapshotService] Auto-approval error for ${withdrawalId}:`, autoErr.message);
                 botDecision = 'MANUEL';
                 decisionReason = `Kural kontrolü hatası: ${autoErr.message}`;
+
+                // Save error to decisionData
+                turnoverRes.decisionData = turnoverRes.decisionData || {};
+                turnoverRes.decisionData.ruleEvaluation = {
+                    approved: false,
+                    reason: decisionReason,
+                    passedRules: [],
+                    failedRules: [`ERROR: ${autoErr.message}`],
+                    matchedBonusRule: null
+                };
             }
+        } else {
+            // Decision was already MANUEL or RET from turnover check
+            turnoverRes.decisionData = turnoverRes.decisionData || {};
+            turnoverRes.decisionData.ruleEvaluation = {
+                approved: false,
+                reason: decisionReason,
+                passedRules: [],
+                failedRules: [`TURNOVER: ${decisionReason}`],
+                matchedBonusRule: null,
+                skippedReason: 'Çevrim kontrolü başarısız olduğu için kural motoru atlandı'
+            };
         }
 
         // Prepare client data with full details (including KPI)

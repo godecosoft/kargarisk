@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
     CheckCircle, XCircle, AlertCircle, ArrowLeft, Wifi,
-    AlertTriangle, Trophy, Gamepad2, Gift, ChevronDown, ChevronUp
+    AlertTriangle, Trophy, Gamepad2, Gift, ChevronDown, ChevronUp, Info, X
 } from 'lucide-react';
 import {
     fetchClientTurnover, fetchClientBonuses, fetchClientSports,
@@ -116,6 +116,7 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
     const [clientDetails, setClientDetails] = useState(null);
     const [loading, setLoading] = useState(true);
     const [expandedIps, setExpandedIps] = useState({}); // Accordion için
+    const [showDecisionModal, setShowDecisionModal] = useState(false); // Karar Özeti modal
 
     // Load all data
     useEffect(() => {
@@ -177,6 +178,9 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
     const sportsBets = sports?.bets || [];
     const totalPercentage = turnover?.turnover?.total?.percentage || 0;
 
+    // Rule evaluation data for Decision Summary modal
+    const ruleEvaluation = turnover?.decisionData?.ruleEvaluation || null;
+
     // SPİN GÖMME TESPİTİ
     // Backend'den gelen kronolojik kontrol sonucu
     const spinHoardingData = turnover?.turnover?.spinHoarding || { detected: false, games: [] };
@@ -219,12 +223,31 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                         {withdrawal.State === 0 ? 'YENİ' : withdrawal.State === 1 ? 'BEKLEMEDE' : withdrawal.State === 2 ? 'ÖDENDİ' : 'REDDEDİLDİ'}
                     </span>
                 </div>
-                <DecisionBadge decision={decision} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <DecisionBadge decision={decision} />
+                    <button
+                        onClick={() => setShowDecisionModal(true)}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: '6px',
+                            padding: '8px 16px', borderRadius: '8px',
+                            background: 'var(--bg-tertiary)', border: '1px solid var(--border-subtle)',
+                            color: 'var(--text-secondary)', cursor: 'pointer',
+                            fontSize: '13px', fontWeight: 600
+                        }}
+                    >
+                        <Info size={16} /> Karar Özeti
+                    </button>
+                </div>
             </div>
 
             {/* Decision Reason */}
             {decisionReason && (
-                <div className="decision-reason">
+                <div
+                    className="decision-reason"
+                    onClick={() => setShowDecisionModal(true)}
+                    style={{ cursor: 'pointer' }}
+                    title="Detaylar için tıklayın"
+                >
                     {decisionReason}
                 </div>
             )}
@@ -795,6 +818,94 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                 </>
             )}
 
+            {/* Decision Summary Modal */}
+            {showDecisionModal && (
+                <div className="modal-overlay" onClick={() => setShowDecisionModal(false)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3>📋 Karar Özeti</h3>
+                            <button className="modal-close" onClick={() => setShowDecisionModal(false)}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            {/* Final Decision */}
+                            <div className={`decision-summary-box ${decision === 'ONAY' ? 'approved' : decision === 'RET' ? 'rejected' : 'manual'}`}>
+                                <div className="decision-icon">
+                                    {decision === 'ONAY' ? <CheckCircle size={32} /> : decision === 'RET' ? <XCircle size={32} /> : <AlertCircle size={32} />}
+                                </div>
+                                <div className="decision-text">
+                                    <div className="decision-label">Son Karar</div>
+                                    <div className="decision-value">{decision}</div>
+                                </div>
+                            </div>
+
+                            {/* Decision Reason */}
+                            {decisionReason && (
+                                <div className="summary-section">
+                                    <div className="section-label">Karar Sebebi</div>
+                                    <div className="reason-text">{decisionReason}</div>
+                                </div>
+                            )}
+
+                            {/* Matched Bonus Rule */}
+                            {ruleEvaluation?.matchedBonusRule && (
+                                <div className="summary-section bonus-rule">
+                                    <div className="section-label">🎁 Eşleşen Bonus Kuralı</div>
+                                    <div className="bonus-rule-name">{ruleEvaluation.matchedBonusRule}</div>
+                                </div>
+                            )}
+
+                            {/* Skipped Reason */}
+                            {ruleEvaluation?.skippedReason && (
+                                <div className="summary-section skipped">
+                                    <div className="section-label">⚠️ Atlanan Kontroller</div>
+                                    <div className="skipped-text">{ruleEvaluation.skippedReason}</div>
+                                </div>
+                            )}
+
+                            {/* Passed Rules */}
+                            {ruleEvaluation?.passedRules?.length > 0 && (
+                                <div className="summary-section passed-rules">
+                                    <div className="section-label">✅ Geçen Kurallar ({ruleEvaluation.passedRules.length})</div>
+                                    <div className="rules-list">
+                                        {ruleEvaluation.passedRules.map((rule, i) => (
+                                            <div key={i} className="rule-item passed">
+                                                <CheckCircle size={14} /> {rule}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Failed Rules */}
+                            {ruleEvaluation?.failedRules?.length > 0 && (
+                                <div className="summary-section failed-rules">
+                                    <div className="section-label">❌ Başarısız Kurallar ({ruleEvaluation.failedRules.length})</div>
+                                    <div className="rules-list">
+                                        {ruleEvaluation.failedRules.map((rule, i) => (
+                                            <div key={i} className="rule-item failed">
+                                                <XCircle size={14} /> {rule}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* No Rule Data */}
+                            {!ruleEvaluation && (
+                                <div className="summary-section no-data">
+                                    <div className="no-data-text">
+                                        Kural değerlendirme verisi bulunamadı.
+                                        Bu çekim eski bir snapshot ile oluşturulmuş olabilir.
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <style>{`
                 .compact-detail-page {
                     height: 100vh;
@@ -1089,6 +1200,99 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                     justify-content: center;
                     color: var(--text-muted);
                 }
+
+                /* Decision Summary Modal */
+                .modal-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0, 0, 0, 0.7);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 1000;
+                    backdrop-filter: blur(4px);
+                }
+                .modal-content {
+                    background: var(--bg-card);
+                    border: 1px solid var(--border-subtle);
+                    border-radius: var(--radius-lg);
+                    width: 90%;
+                    max-width: 600px;
+                    max-height: 80vh;
+                    overflow: hidden;
+                    display: flex;
+                    flex-direction: column;
+                    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+                }
+                .modal-header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 16px 20px;
+                    border-bottom: 1px solid var(--border-subtle);
+                }
+                .modal-header h3 {
+                    margin: 0;
+                    font-size: 18px;
+                    color: var(--text-primary);
+                }
+                .modal-close {
+                    background: transparent;
+                    border: none;
+                    color: var(--text-muted);
+                    cursor: pointer;
+                    padding: 4px;
+                    border-radius: 4px;
+                }
+                .modal-close:hover { background: var(--bg-hover); color: var(--text-primary); }
+                .modal-body {
+                    padding: 20px;
+                    overflow-y: auto;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 16px;
+                }
+                .decision-summary-box {
+                    display: flex;
+                    align-items: center;
+                    gap: 16px;
+                    padding: 20px;
+                    border-radius: var(--radius-md);
+                }
+                .decision-summary-box.approved { background: rgba(34, 197, 94, 0.15); border: 2px solid #22c55e; color: #22c55e; }
+                .decision-summary-box.rejected { background: rgba(239, 68, 68, 0.15); border: 2px solid #ef4444; color: #ef4444; }
+                .decision-summary-box.manual { background: rgba(245, 158, 11, 0.15); border: 2px solid #f59e0b; color: #f59e0b; }
+                .decision-icon { flex-shrink: 0; }
+                .decision-text { flex: 1; }
+                .decision-label { font-size: 12px; opacity: 0.8; text-transform: uppercase; }
+                .decision-value { font-size: 24px; font-weight: 700; }
+                .summary-section {
+                    background: var(--bg-tertiary);
+                    border-radius: var(--radius-md);
+                    padding: 14px 16px;
+                }
+                .summary-section.bonus-rule { background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); }
+                .summary-section.skipped { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); }
+                .summary-section.no-data { background: rgba(156, 163, 175, 0.1); }
+                .section-label { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; font-weight: 600; }
+                .reason-text { font-size: 14px; color: var(--text-primary); }
+                .bonus-rule-name { font-size: 16px; font-weight: 600; color: var(--accent-primary); }
+                .skipped-text { font-size: 13px; color: #f59e0b; }
+                .no-data-text { font-size: 13px; color: var(--text-muted); text-align: center; padding: 20px; }
+                .rules-list { display: flex; flex-direction: column; gap: 6px; }
+                .rule-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 8px 12px;
+                    border-radius: 6px;
+                    font-size: 13px;
+                }
+                .rule-item.passed { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
+                .rule-item.failed { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
             `}</style>
         </div>
     );
