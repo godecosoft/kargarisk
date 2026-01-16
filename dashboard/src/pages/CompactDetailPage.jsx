@@ -768,6 +768,24 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                                                             }}>{b.resultTypeName}</span>
                                                             {b.isFreeSpin && <span style={{ fontSize: '10px' }}>🎰</span>}
                                                         </div>
+
+                                                        {/* Wagering Progress */}
+                                                        {b.wageringInfo && (
+                                                            <div style={{ marginTop: '8px' }}>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '2px', color: 'var(--text-muted)' }}>
+                                                                    <span>Çevrim: %{b.wageringInfo.percentage}</span>
+                                                                    <span>{formatCurrency(b.wageringInfo.wageredAmount)} / {formatCurrency(b.wageringInfo.amountToWager)}</span>
+                                                                </div>
+                                                                <div style={{ height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+                                                                    <div style={{
+                                                                        height: '100%',
+                                                                        width: `${Math.min(b.wageringInfo.percentage, 100)}%`,
+                                                                        background: b.wageringInfo.percentage >= 100 ? 'var(--status-approved)' : 'var(--accent-primary)',
+                                                                        transition: 'width 0.3s ease'
+                                                                    }} />
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                                                         <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--accent-primary)' }}>{formatCurrency(b.amount)}</div>

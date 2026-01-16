@@ -192,11 +192,27 @@ async function createSnapshot(withdrawal) {
                     reason: autoApprovalResult.reason,
                     passedRules: autoApprovalResult.ruleResult?.passedRules || [],
                     failedRules: autoApprovalResult.ruleResult?.failedRules || [],
-                    matchedBonusRule: autoApprovalResult.matchedBonusRule?.name || null
+                    matchedBonusRule: autoApprovalResult.matchedBonusRule?.name || null,
+                    simulationOnly: autoApprovalResult.simulationOnly || false
                 };
 
                 // CRITICAL: Update botDecision based on rule engine result
-                if (!autoApprovalResult.approved) {
+                // In SIMULATION mode (system disabled), approved=true means "would be approved"
+                // But we don't actually approve - botDecision stays based on whether rules passed
+                if (autoApprovalResult.simulationOnly) {
+                    // Simulation mode - show what decision WOULD be
+                    // If rules passed, show ONAY (simulated), otherwise MANUEL
+                    if (autoApprovalResult.approved) {
+                        // Rules passed, would be approved if system was on
+                        // Keep botDecision as ONAY but add simulation note
+                        decisionReason = autoApprovalResult.reason || 'Simülasyon: Tüm kurallar geçti';
+                        logger.info(`[SnapshotService] SIMULATION: Would approve ${withdrawalId}`);
+                    } else {
+                        botDecision = 'MANUEL';
+                        decisionReason = autoApprovalResult.reason || 'Kural motoru reddetti';
+                    }
+                } else if (!autoApprovalResult.approved) {
+                    // Real mode - rules failed
                     botDecision = 'MANUEL';
                     decisionReason = autoApprovalResult.reason || 'Kural motoru reddetti';
                     logger.info(`[SnapshotService] Decision changed to MANUEL for ${withdrawalId}: ${decisionReason}`);

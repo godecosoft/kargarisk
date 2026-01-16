@@ -165,6 +165,12 @@ function evaluateRules(withdrawal, snapshot, rules, bonusRule = null) {
         // If it's a bonus withdrawal but NO rule matched -> REJECT
         result.passed = false;
         result.failedRules.push('BONUS_RULE: Tanımlı bonus kuralı bulunamadı (Default Reject)');
+    } else if (withdrawalType === 'CASHBACK') {
+        // CASHBACK also requires a matching rule (until cashback rules are defined)
+        if (!bonusRule) {
+            result.passed = false;
+            result.failedRules.push('CASHBACK_RULE: Tanımlı cashback kuralı bulunamadı (Default Reject)');
+        }
     }
 
     // 1. MAX_AMOUNT - Check withdrawal amount (Global)
