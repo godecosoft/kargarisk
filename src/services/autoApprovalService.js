@@ -360,15 +360,10 @@ async function processAutoApproval(withdrawal, snapshot) {
         // Get current rules
         const rules = await getRules();
 
-        // Check master toggle first
-        if (!rules.AUTO_APPROVAL_ENABLED?.enabled) {
-            logger.info(`[AutoApproval] System disabled, skipping withdrawal ${withdrawal.Id}`);
-            return {
-                approved: false,
-                reason: 'Otomatik onay sistemi kapalı',
-                ruleResult: { passed: false, failedRules: ['AUTO_APPROVAL_ENABLED: Sistem kapalı'] }
-            };
-        }
+        // NOTE: We evaluate ALL rules regardless of AUTO_APPROVAL_ENABLED toggle
+        // This is SIMULATION MODE - shows what decision WOULD be if system was on
+        // Actual BC API approval only happens if toggle is enabled (checked later)
+        const isSystemEnabled = rules.AUTO_APPROVAL_ENABLED?.enabled || false;
 
         // Check for Bonus Rule Match (Dynamic Bonus Management)
         let matchedBonusRule = null;
@@ -388,9 +383,11 @@ async function processAutoApproval(withdrawal, snapshot) {
                     reason: `RISK TESPİT EDİLDİ: ${riskAnalysis.details.join(', ')}`,
                     ruleResult: {
                         passed: false,
-                        failedRules: [`RISK: ${riskAnalysis.details.join(', ')}`]
+                        failedRules: [`RISK: ${riskAnalysis.details.join(', ')}`],
+                        passedRules: []
                     },
-                    riskAnalysis
+                    riskAnalysis,
+                    matchedBonusRule
                 };
             }
         }
@@ -416,12 +413,27 @@ async function processAutoApproval(withdrawal, snapshot) {
             return {
                 approved: false,
                 reason: ruleResult.failedRules.join(', '),
-                ruleResult
+                ruleResult,
+                matchedBonusRule
             };
         }
 
-        // All rules passed - call BC API to approve
+        // ALL RULES PASSED!
+        // Now check if we should actually call BC API to approve
+        if (!isSystemEnabled) {
+            logger.info(`[AutoApproval] SIMULATION: Withdrawal ${withdrawal.Id} would be approved, but system is DISABLED`);
+            return {
+                approved: true,  // Simulation result - shows ONAY in dashboard
+                reason: 'Tüm kurallar geçti (Simülasyon - Sistem kapalı, gerçek onay yapılmadı)',
+                ruleResult,
+                matchedBonusRule,
+                simulationOnly: true  // Flag to indicate no actual approval happened
+            };
+        }
+
+        // System is enabled - proceed with actual approval
         logger.info(`[AutoApproval] Approving withdrawal ${withdrawal.Id}...`);
+
 
         // STEP: Handle balance-based bonus rules BEFORE approval
         if (matchedBonusRule) {

@@ -12,6 +12,37 @@ const sportsService = require('./sportsService');
 const ipControlService = require('./ipControlService');
 
 /**
+ * Safe JSON stringify that handles circular references and errors
+ * @param {*} obj - Object to stringify
+ * @param {string} name - Name for logging
+ * @returns {string} JSON string or null
+ */
+function safeStringify(obj, name = 'object') {
+    if (obj === null || obj === undefined) return null;
+    try {
+        // Use custom replacer to handle circular references and non-serializable values
+        const seen = new WeakSet();
+        return JSON.stringify(obj, (key, value) => {
+            if (typeof value === 'object' && value !== null) {
+                if (seen.has(value)) {
+                    return '[Circular]';
+                }
+                seen.add(value);
+            }
+            // Handle functions - convert to string representation
+            if (typeof value === 'function') {
+                return '[Function]';
+            }
+            return value;
+        });
+    } catch (error) {
+        logger.error(`[SnapshotService] safeStringify failed for ${name}:`, error.message);
+        // Return a minimal valid JSON
+        return JSON.stringify({ error: `Serialization failed: ${error.message}` });
+    }
+}
+
+/**
  * Get a withdrawal snapshot from DB
  * @param {number} withdrawalId - Withdrawal ID
  * @returns {Object|null} Snapshot data or null if not found
@@ -255,13 +286,13 @@ async function createSnapshot(withdrawal) {
             botDecision,
             decisionReason,
             withdrawalType,
-            JSON.stringify(withdrawal),
-            JSON.stringify(clientData),
-            JSON.stringify(turnoverRes),
-            JSON.stringify(sportsRes),
-            JSON.stringify(bonusesRes),
-            JSON.stringify(bonusTxRes),
-            JSON.stringify(ipRes)
+            safeStringify(withdrawal, 'withdrawal'),
+            safeStringify(clientData, 'clientData'),
+            safeStringify(turnoverRes, 'turnoverRes'),
+            safeStringify(sportsRes, 'sportsRes'),
+            safeStringify(bonusesRes, 'bonusesRes'),
+            safeStringify(bonusTxRes, 'bonusTxRes'),
+            safeStringify(ipRes, 'ipRes')
         ]);
 
         logger.info(`[SnapshotService] Snapshot created: withdrawal=${withdrawalId}, decision=${botDecision}`);
