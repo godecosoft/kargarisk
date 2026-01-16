@@ -1,11 +1,15 @@
 /**
  * Decision Service
  * Manages auto-control decisions with database persistence
+ * Now aligned with autoApprovalService logic (Rule Engine + Bonus Rules + Risk)
  */
 
 const db = require('../db/mysql');
 const turnoverService = require('./turnoverService');
 const sportsService = require('./sportsService');
+const autoApprovalService = require('./autoApprovalService');
+const bonusRulesService = require('./bonusRulesService');
+const riskService = require('./riskService');
 
 /**
  * Get decision for a withdrawal
@@ -132,15 +136,14 @@ async function getDecisionsBatch(withdrawals) {
 }
 
 /**
- * Calculate decision based on turnover and sports data
+ * Calculate decision based on turnover, sports data, Rule Engine and Bonus Rules
+ * This simulates the full auto-approval logic WITHOUT actually calling BC API
  */
-async function calculateDecision(clientId, withdrawalAmount) {
+async function calculateDecision(clientId, withdrawalAmount, withdrawalObject = null) {
     try {
         // Get turnover report
         const turnoverReport = await turnoverService.getTurnoverReport(clientId);
-
-        // Return report for audit logging
-        turnoverReport.fullReport = true; // Marker if needed
+        turnoverReport.fullReport = true;
 
         // Get sports report for pre-deposit winning check
         let sportsReport = null;
@@ -153,14 +156,137 @@ async function calculateDecision(clientId, withdrawalAmount) {
             console.log('[DecisionService] Sports check skipped:', e.message);
         }
 
-        // Determine decision
+        // Start with turnover decision
         let decision = turnoverReport.decision || 'MANUEL';
         let reason = turnoverReport.decisionReason || 'Hesaplanamadı';
+        let ruleDetails = [];
 
         // Override to MANUEL if pre-deposit winning found
         if (sportsReport?.hasPreDepositWinning) {
             decision = 'MANUEL';
             reason = 'Yatırım öncesi kazançlı spor kuponu tespit edildi';
+        }
+
+        // If turnover says ONAY, run full auto-approval simulation
+        // NOTE: We evaluate rules REGARDLESS of AUTO_APPROVAL_ENABLED toggle
+        // This lets us see what decision WOULD be, even if auto-approval is off
+        if (decision === 'ONAY') {
+            try {
+                // Get auto-approval rules
+                const rules = await autoApprovalService.getRules();
+
+                // Fetch bonus data for complete rule evaluation
+                let bonuses = [];
+                let bonusTransactions = { data: [] };
+
+                try {
+                    // Get last bonuses (for NO_BONUS_AFTER_DEPOSIT rule)
+                    const bonusService = require('./bonusService');
+                    bonuses = await bonusService.getLastBonuses(clientId, 5) || [];
+
+                    // Get transactions to extract FreeSpin/Bonus transactions
+                    const transactions = await turnoverService.getClientTransactions(clientId, 2);
+                    const depositTime = turnoverReport.deposit?.time
+                        ? new Date(turnoverReport.deposit.time)
+                        : new Date(0);
+
+                    // Filter FreeSpin, Bonus, and Correction transactions after deposit
+                    const bonusTx = transactions.filter(tx => {
+                        const txTime = new Date(tx.CreatedLocal);
+                        if (txTime <= depositTime) return false;
+                        // FreeSpin (DocumentTypeId 15 with 'freespin' in Game)
+                        if (tx.DocumentTypeId === 15 && tx.Game?.toLowerCase().includes('freespin')) return true;
+                        // Pay Client Bonus (DocumentTypeId 83)
+                        if (tx.DocumentTypeId === 83) return true;
+                        // Correction Up (DocumentTypeId 301)
+                        if (tx.DocumentTypeId === 301) return true;
+                        // Correction Down (DocumentTypeId 302)
+                        if (tx.DocumentTypeId === 302) return true;
+                        return false;
+                    }).map(tx => {
+                        let type = 'UNKNOWN';
+                        if (tx.DocumentTypeId === 83) type = 'BONUS';
+                        else if (tx.DocumentTypeId === 15) type = 'FREESPIN';
+                        else if (tx.DocumentTypeId === 301) type = 'CORRECTION_UP';
+                        else if (tx.DocumentTypeId === 302) type = 'CORRECTION_DOWN';
+
+                        return {
+                            type,
+                            game: tx.Game,
+                            amount: tx.Amount,
+                            time: tx.CreatedLocal,
+                            CreatedLocal: tx.CreatedLocal,
+                            userName: tx.UserName,
+                            note: tx.Note
+                        };
+                    });
+
+                    bonusTransactions = { data: bonusTx };
+                } catch (bonusErr) {
+                    console.log('[DecisionService] Bonus fetch skipped:', bonusErr.message);
+                }
+
+                // Build snapshot-like object for rule evaluation
+                const snapshotData = {
+                    turnover: turnoverReport,
+                    bonuses: bonuses,
+                    bonusTransactions: bonusTransactions,
+                    sports: sportsReport
+                };
+
+                // Build withdrawal-like object
+                const withdrawal = withdrawalObject || {
+                    Id: 0,
+                    ClientId: clientId,
+                    Amount: withdrawalAmount || 0
+                };
+
+                // RISK ANALYSIS
+                const riskAnalysis = riskService.analyzeRisk(withdrawal, snapshotData);
+                if (riskAnalysis.isRisky && riskAnalysis.totalRiskLevel === 'HIGH') {
+                    decision = 'MANUEL';
+                    reason = `RISK TESPİT: ${riskAnalysis.details?.join(', ') || 'Spin gömme şüphesi'}`;
+                    ruleDetails.push(`RISK: ${riskAnalysis.totalRiskLevel}`);
+                } else {
+                    // CHECK BONUS RULES (if applicable)
+                    const withdrawalType = turnoverReport.withdrawalType?.type;
+                    const isBonusOrFreeSpin = withdrawalType === 'BONUS' || withdrawalType === 'FREESPIN';
+                    let matchedBonusRule = null;
+
+                    if (isBonusOrFreeSpin) {
+                        const bonusTransaction = turnoverReport.deposit || {};
+                        matchedBonusRule = await bonusRulesService.findMatchingRule(bonusTransaction);
+
+                        if (!matchedBonusRule) {
+                            decision = 'MANUEL';
+                            reason = 'Tanımlı bonus kuralı bulunamadı';
+                            ruleDetails.push('BONUS_RULE: Eşleşen kural yok');
+                        }
+                    }
+
+                    // EVALUATE RULES (only if still ONAY)
+                    if (decision === 'ONAY') {
+                        const ruleResult = autoApprovalService.evaluateRules(
+                            withdrawal,
+                            snapshotData,
+                            rules,
+                            matchedBonusRule
+                        );
+
+                        if (!ruleResult.passed) {
+                            decision = 'MANUEL';
+                            reason = ruleResult.failedRules.join(', ');
+                            ruleDetails = ruleResult.failedRules;
+                        } else {
+                            ruleDetails = ruleResult.passedRules;
+                        }
+                    }
+                }
+            } catch (ruleError) {
+                console.error('[DecisionService] Rule evaluation error:', ruleError.message);
+                // Don't change decision on rule error, just log
+                ruleDetails.push(`RULE_ERROR: ${ruleError.message}`);
+            }
         }
 
         return {
@@ -170,7 +296,7 @@ async function calculateDecision(clientId, withdrawalAmount) {
             turnover: turnoverReport.turnover,
             deposit: turnoverReport.deposit,
             hasPreDepositWin: sportsReport?.hasPreDepositWinning || false,
-            // Return full report data for logging
+            ruleDetails,
             turnoverReport: turnoverReport,
             sportsReport: sportsReport
         };

@@ -473,7 +473,7 @@ async function fetchSportsData(clientId) {
     }
 }
 
-// Helper: Fetch bonus transactions (FreeSpin + Pay Client Bonus after deposit)
+// Helper: Fetch bonus transactions (FreeSpin + Pay Client Bonus + Corrections after deposit)
 async function fetchBonusTransactions(clientId) {
     try {
         const transactions = await turnoverService.getClientTransactions(clientId, 2);
@@ -483,17 +483,33 @@ async function fetchBonusTransactions(clientId) {
         const bonusTx = transactions.filter(tx => {
             const txTime = new Date(tx.CreatedLocal);
             if (txTime <= depositTime) return false;
+            // FreeSpin (DocumentTypeId 15 with 'freespin' in Game)
             if (tx.DocumentTypeId === 15 && tx.Game?.toLowerCase().includes('freespin')) return true;
+            // Pay Client Bonus (DocumentTypeId 83)
             if (tx.DocumentTypeId === 83) return true;
+            // Correction Up (DocumentTypeId 301)
+            if (tx.DocumentTypeId === 301) return true;
+            // Correction Down (DocumentTypeId 302)
+            if (tx.DocumentTypeId === 302) return true;
             return false;
-        }).map(tx => ({
-            type: tx.DocumentTypeId === 83 ? 'BONUS' : 'FREESPIN',
-            game: tx.Game,
-            amount: tx.Amount,
-            balance: tx.Balance,
-            time: tx.CreatedLocal,
-            balanceBefore: tx.Balance - tx.Amount
-        }));
+        }).map(tx => {
+            let type = 'UNKNOWN';
+            if (tx.DocumentTypeId === 83) type = 'BONUS';
+            else if (tx.DocumentTypeId === 15) type = 'FREESPIN';
+            else if (tx.DocumentTypeId === 301) type = 'CORRECTION_UP';
+            else if (tx.DocumentTypeId === 302) type = 'CORRECTION_DOWN';
+
+            return {
+                type,
+                game: tx.Game,
+                amount: tx.Amount,
+                balance: tx.Balance,
+                time: tx.CreatedLocal,
+                balanceBefore: tx.Balance - tx.Amount,
+                userName: tx.UserName,
+                note: tx.Note
+            };
+        });
 
         return { success: true, data: bonusTx };
     } catch (error) {
