@@ -768,17 +768,27 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                         </div>
                     </div>
 
-                    {/* Footer: FreeSpin & Bonus İşlemleri */}
+                    {/* Footer: FreeSpin & Bonus & Düzeltme İşlemleri */}
                     {bonusTx.length > 0 && (
                         <div className="footer-bar">
-                            <span className="footer-title">FreeSpin & Bonus İşlemleri</span>
+                            <span className="footer-title">Yatırım Sonrası İşlemler</span>
                             <div className="tx-chips">
-                                {bonusTx.map((tx, i) => (
-                                    <div key={i} className={`tx-chip ${tx.type.toLowerCase()}`}>
-                                        <span>{tx.type === 'FREESPIN' ? '🎰' : '🎁'} {formatCurrency(tx.amount)}</span>
-                                        {tx.time && <span className="tx-time">{formatTime(tx.time)}</span>}
-                                    </div>
-                                ))}
+                                {bonusTx.map((tx, i) => {
+                                    let emoji = '❓';
+                                    let cssClass = 'unknown';
+                                    if (tx.type === 'FREESPIN') { emoji = '🎰'; cssClass = 'freespin'; }
+                                    else if (tx.type === 'BONUS') { emoji = '🎁'; cssClass = 'bonus'; }
+                                    else if (tx.type === 'CORRECTION_UP') { emoji = '⬆️'; cssClass = 'correction-up'; }
+                                    else if (tx.type === 'CORRECTION_DOWN') { emoji = '⬇️'; cssClass = 'correction-down'; }
+
+                                    return (
+                                        <div key={i} className={`tx-chip ${cssClass}`}>
+                                            <span>{emoji} {formatCurrency(tx.amount)}</span>
+                                            {tx.userName && <span className="tx-user">{tx.userName}</span>}
+                                            {tx.time && <span className="tx-time">{formatTime(tx.time)}</span>}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
@@ -1059,7 +1069,10 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                 }
                 .tx-chip.freespin { background: var(--status-processing-bg); color: var(--status-processing); }
                 .tx-chip.bonus { background: var(--status-approved-bg); color: var(--status-approved); }
+                .tx-chip.correction-up { background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3); }
+                .tx-chip.correction-down { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
                 .tx-chip { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+                .tx-user { font-size: 9px; opacity: 0.8; font-weight: 500; }
                 .tx-time { font-size: 10px; opacity: 0.7; }
 
                 .time-row { margin-top: -4px; }
