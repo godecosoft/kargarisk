@@ -112,8 +112,8 @@ async function createSnapshot(withdrawal) {
             bcClient.getClientKpi(clientId)
         ]);
 
-        // Extract decision from turnover report
-        const botDecision = turnoverRes.decision || 'MANUEL';
+        // Extract initial decision from turnover report
+        let botDecision = turnoverRes.decision || 'MANUEL';
         let decisionReason = turnoverRes.decisionReason || '';
         const withdrawalType = turnoverRes.withdrawalType?.type || 'DEPOSIT';
 
@@ -134,11 +134,39 @@ async function createSnapshot(withdrawal) {
 
         // If HIGH risk, update decision
         if (riskAnalysis.isRisky && riskAnalysis.totalRiskLevel === 'HIGH') {
+            botDecision = 'MANUEL';
             decisionReason = `RİSK TESPİT: ${riskAnalysis.hoarding?.details?.join(', ') || 'Spin gömme şüphesi'}`;
             logger.info(`[SnapshotService] HIGH RISK detected for ${withdrawalId}:`, riskAnalysis);
         }
 
-        // Save to database
+        // RULE ENGINE CHECK - Run auto-approval evaluation BEFORE saving to DB
+        let autoApprovalResult = null;
+        if (botDecision === 'ONAY') {
+            try {
+                const autoApprovalService = require('./autoApprovalService');
+                const snapshotData = {
+                    turnover: turnoverRes,
+                    bonuses: bonusesRes,
+                    bonusTransactions: bonusTxRes,
+                    sports: sportsRes,
+                    ipAnalysis: ipRes
+                };
+                autoApprovalResult = await autoApprovalService.processAutoApproval(withdrawal, snapshotData);
+                logger.info(`[SnapshotService] Auto-approval result for ${withdrawalId}:`, JSON.stringify(autoApprovalResult));
+
+                // CRITICAL: Update botDecision based on rule engine result
+                if (!autoApprovalResult.approved) {
+                    botDecision = 'MANUEL';
+                    decisionReason = autoApprovalResult.reason || 'Kural motoru reddetti';
+                    logger.info(`[SnapshotService] Decision changed to MANUEL for ${withdrawalId}: ${decisionReason}`);
+                }
+            } catch (autoErr) {
+                logger.error(`[SnapshotService] Auto-approval error for ${withdrawalId}:`, autoErr.message);
+                botDecision = 'MANUEL';
+                decisionReason = `Kural kontrolü hatası: ${autoErr.message}`;
+            }
+        }
+
         // Prepare client data with full details (including KPI)
         const clientData = {
             balance: withdrawal.Balance,
@@ -165,6 +193,7 @@ async function createSnapshot(withdrawal) {
                 totalUnsettledBets: kpiRes?.TotalUnsettledBets
             }
         };
+
 
         await pool.query(`
             INSERT INTO withdrawals (
@@ -197,29 +226,6 @@ async function createSnapshot(withdrawal) {
         ]);
 
         logger.info(`[SnapshotService] Snapshot created: withdrawal=${withdrawalId}, decision=${botDecision}`);
-
-        // If decision is ONAY, trigger auto-approval
-        let autoApprovalResult = null;
-        logger.info(`[SnapshotService] Checking auto-approval eligibility: decision=${botDecision}, isONAY=${botDecision === 'ONAY'}`);
-
-        if (botDecision === 'ONAY') {
-            try {
-                const autoApprovalService = require('./autoApprovalService');
-                const snapshotData = {
-                    turnover: turnoverRes,
-                    bonuses: bonusesRes,
-                    bonusTransactions: bonusTxRes,
-                    sports: sportsRes,
-                    ipAnalysis: ipRes
-                };
-                autoApprovalResult = await autoApprovalService.processAutoApproval(withdrawal, snapshotData);
-                logger.info(`[SnapshotService] Auto-approval result for ${withdrawalId}:`, JSON.stringify(autoApprovalResult));
-            } catch (autoErr) {
-                logger.error(`[SnapshotService] Auto-approval error for ${withdrawalId}:`, autoErr.message);
-            }
-        } else {
-            logger.info(`[SnapshotService] Skipping auto-approval for ${withdrawalId}: decision is ${botDecision}, not ONAY`);
-        }
 
         return {
             success: true,
