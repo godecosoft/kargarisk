@@ -203,6 +203,9 @@ async function createSnapshot(withdrawal) {
         turnoverRes.decision = botDecision;
         turnoverRes.decisionReason = decisionReason;
 
+        // DEBUG: Log decisionData before saving
+        logger.info(`[SnapshotService] Saving decisionData for ${withdrawalId}:`, JSON.stringify(turnoverRes.decisionData));
+
         // Prepare client data with full details (including KPI)
         const clientData = {
             balance: withdrawal.Balance,
