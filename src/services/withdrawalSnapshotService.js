@@ -198,6 +198,11 @@ async function createSnapshot(withdrawal) {
             };
         }
 
+        // CRITICAL: Sync turnoverRes.decision with final botDecision
+        // This ensures detail page shows same decision as list page
+        turnoverRes.decision = botDecision;
+        turnoverRes.decisionReason = decisionReason;
+
         // Prepare client data with full details (including KPI)
         const clientData = {
             balance: withdrawal.Balance,
