@@ -23,6 +23,7 @@ export default function BonusRulesPage() {
         max_remaining_balance: 0,
         require_deposit_id: false,
         delete_excess_balance: false,
+        check_wagering_status: false,
         // Enabled flags for each numeric field
         max_amount_enabled: false,
         turnover_multiplier_enabled: false,
@@ -46,6 +47,7 @@ export default function BonusRulesPage() {
         max_remaining_balance: 0,
         require_deposit_id: false,
         delete_excess_balance: false,
+        check_wagering_status: false,
         max_amount_enabled: false,
         turnover_multiplier_enabled: false,
         min_withdrawal_multiplier_enabled: false,
@@ -129,6 +131,7 @@ export default function BonusRulesPage() {
             max_remaining_balance: rule.max_remaining_balance || 0,
             require_deposit_id: Boolean(rule.require_deposit_id),
             delete_excess_balance: Boolean(rule.delete_excess_balance),
+            check_wagering_status: Boolean(rule.check_wagering_status),
             // Enabled flags
             max_amount_enabled: Boolean(rule.max_amount_enabled),
             turnover_multiplier_enabled: Boolean(rule.turnover_multiplier_enabled),
@@ -255,6 +258,17 @@ export default function BonusRulesPage() {
                                                 type="checkbox"
                                                 checked={rule.require_deposit_id}
                                                 onChange={() => toggleStatus(rule, 'require_deposit_id')}
+                                            />
+                                            <span className="slider"></span>
+                                        </label>
+                                    </div>
+                                    <div className="setting-row switch-row">
+                                        <span className="setting-label">Bonus Çevrim Kontrolü</span>
+                                        <label className="toggle-switch">
+                                            <input
+                                                type="checkbox"
+                                                checked={rule.check_wagering_status}
+                                                onChange={() => toggleStatus(rule, 'check_wagering_status')}
                                             />
                                             <span className="slider"></span>
                                         </label>
@@ -486,6 +500,17 @@ export default function BonusRulesPage() {
                                         onChange={e => setFormData({ ...formData, require_deposit_id: e.target.checked })}
                                     />
                                     <span>Yatırım ID Kontrolü Gerekli</span>
+                                </label>
+                            </div>
+
+                            <div className="form-check-group" style={{ background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+                                <label className="check-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.check_wagering_status}
+                                        onChange={e => setFormData({ ...formData, check_wagering_status: e.target.checked })}
+                                    />
+                                    <span>Bonus Çevrim Kontrolü (Ana Para + Bonus Çevrimi)</span>
                                 </label>
                             </div>
 
