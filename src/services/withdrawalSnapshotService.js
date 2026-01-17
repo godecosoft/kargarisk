@@ -72,11 +72,20 @@ async function getSnapshot(withdrawalId) {
                 if (turnoverData?.decisionData?.ruleEvaluation) {
                     ruleEvaluation = turnoverData.decisionData.ruleEvaluation;
                 }
-                // DEBUG LOG
-                logger.info(`[SnapshotService] getSnapshot ${withdrawalId}: ruleEvaluation=${ruleEvaluation ? 'FOUND' : 'NULL'}, hasDecisionData=${!!turnoverData?.decisionData}`);
+                // DETAILED DEBUG LOG
+                logger.info(`[SnapshotService] getSnapshot ${withdrawalId} DEBUG:`, {
+                    hasDecisionData: !!turnoverData?.decisionData,
+                    decisionDataKeys: turnoverData?.decisionData ? Object.keys(turnoverData.decisionData) : [],
+                    hasRuleEvaluation: !!ruleEvaluation,
+                    ruleEvaluationKeys: ruleEvaluation ? Object.keys(ruleEvaluation) : [],
+                    passedRulesCount: ruleEvaluation?.passedRules?.length || 0,
+                    failedRulesCount: ruleEvaluation?.failedRules?.length || 0
+                });
             } catch (parseErr) {
                 logger.error('[SnapshotService] Failed to parse turnover_data:', parseErr.message);
             }
+        } else {
+            logger.warn(`[SnapshotService] getSnapshot ${withdrawalId}: NO turnover_data in DB row!`);
         }
 
         return {
@@ -190,83 +199,66 @@ async function createSnapshot(withdrawal) {
             logger.info(`[SnapshotService] HIGH RISK detected for ${withdrawalId}:`, riskAnalysis);
         }
 
-        // RULE ENGINE CHECK - Run auto-approval evaluation BEFORE saving to DB
-        let autoApprovalResult = null;
-        if (botDecision === 'ONAY') {
-            try {
-                const autoApprovalService = require('./autoApprovalService');
-                const snapshotData = {
-                    turnover: turnoverRes,
-                    bonuses: bonusesRes,
-                    bonusTransactions: bonusTxRes,
-                    sports: sportsRes,
-                    ipAnalysis: ipRes
-                };
-                autoApprovalResult = await autoApprovalService.processAutoApproval(withdrawal, snapshotData);
-                logger.info(`[SnapshotService] Auto-approval result for ${withdrawalId}:`, JSON.stringify(autoApprovalResult));
+        // UNIFIED RULE ENGINE - Replace old autoApprovalService
+        const RuleEngine = require('./ruleEngine');
+        const { loadBonusRules } = require('./ruleEngine/ruleLoader');
 
-                // Save rule evaluation details to decisionData for Decision Summary display
-                turnoverRes.decisionData = turnoverRes.decisionData || {};
-                turnoverRes.decisionData.ruleEvaluation = {
-                    approved: autoApprovalResult.approved,
-                    reason: autoApprovalResult.reason,
-                    passedRules: autoApprovalResult.ruleResult?.passedRules || [],
-                    failedRules: autoApprovalResult.ruleResult?.failedRules || [],
-                    matchedBonusRule: autoApprovalResult.matchedBonusRule?.name || null,
-                    simulationOnly: autoApprovalResult.simulationOnly || false
-                };
+        const ruleEngine = new RuleEngine(1); // site_id = 1
+        const bonusRules = await loadBonusRules();
 
-                // CRITICAL: Update botDecision based on rule engine result
-                // In SIMULATION mode (system disabled), approved=true means "would be approved"
-                // But we don't actually approve - botDecision stays based on whether rules passed
-                if (autoApprovalResult.simulationOnly) {
-                    // Simulation mode - show what decision WOULD be
-                    // If rules passed, show ONAY (simulated), otherwise MANUEL
-                    if (autoApprovalResult.approved) {
-                        // Rules passed, would be approved if system was on
-                        // Keep botDecision as ONAY but add simulation note
-                        decisionReason = autoApprovalResult.reason || 'Simülasyon: Tüm kurallar geçti';
-                        logger.info(`[SnapshotService] SIMULATION: Would approve ${withdrawalId}`);
-                    } else {
-                        botDecision = 'MANUEL';
-                        decisionReason = autoApprovalResult.reason || 'Kural motoru reddetti';
-                    }
-                } else if (!autoApprovalResult.approved) {
-                    // Real mode - rules failed
-                    botDecision = 'MANUEL';
-                    decisionReason = autoApprovalResult.reason || 'Kural motoru reddetti';
-                    logger.info(`[SnapshotService] Decision changed to MANUEL for ${withdrawalId}: ${decisionReason}`);
+        const snapshotData = {
+            turnover: turnoverRes,
+            bonuses: bonusesRes,
+            bonusTransactions: bonusTxRes,
+            sports: sportsRes,
+            ipAnalysis: ipRes
+        };
+
+        let ruleEvaluation = null;
+
+        try {
+            ruleEvaluation = await ruleEngine.evaluate(withdrawal, snapshotData, bonusRules);
+            logger.info(`[SnapshotService] RuleEngine result for ${withdrawalId}:`, JSON.stringify(ruleEvaluation));
+
+            // Apply rule engine decision
+            botDecision = ruleEvaluation.decision;
+            decisionReason = ruleEvaluation.reason;
+
+            // Save rule evaluation to turnoverRes for backward compatibility
+            turnoverRes.decisionData = {
+                riskAnalysis: turnoverRes.decisionData?.riskAnalysis || {},
+                ruleEvaluation: {
+                    approved: ruleEvaluation.decision === 'ONAY',
+                    reason: ruleEvaluation.reason,
+                    withdrawalType: ruleEvaluation.withdrawalType,
+                    matchedBonusRule: ruleEvaluation.matchedBonusRule?.name || null,
+                    rules: ruleEvaluation.rules, // Full rule details array
+                    passedCount: ruleEvaluation.passedCount,
+                    failedCount: ruleEvaluation.failedCount,
+                    totalCount: ruleEvaluation.totalCount,
+                    simulationOnly: ruleEvaluation.simulationMode || false
                 }
-            } catch (autoErr) {
-                logger.error(`[SnapshotService] Auto-approval error for ${withdrawalId}:`, autoErr.message);
-                botDecision = 'MANUEL';
-                decisionReason = `Kural kontrolü hatası: ${autoErr.message}`;
+            };
 
-                // Save error to decisionData
-                turnoverRes.decisionData = turnoverRes.decisionData || {};
-                turnoverRes.decisionData.ruleEvaluation = {
+        } catch (ruleErr) {
+            logger.error(`[SnapshotService] RuleEngine error for ${withdrawalId}:`, ruleErr.message);
+            botDecision = 'MANUEL';
+            decisionReason = `Kural motoru hatası: ${ruleErr.message}`;
+
+            turnoverRes.decisionData = {
+                riskAnalysis: turnoverRes.decisionData?.riskAnalysis || {},
+                ruleEvaluation: {
                     approved: false,
                     reason: decisionReason,
-                    passedRules: [],
-                    failedRules: [`ERROR: ${autoErr.message}`],
-                    matchedBonusRule: null
-                };
-            }
-        } else {
-            // Decision was already MANUEL or RET from turnover check
-            turnoverRes.decisionData = turnoverRes.decisionData || {};
-            turnoverRes.decisionData.ruleEvaluation = {
-                approved: false,
-                reason: decisionReason,
-                passedRules: [],
-                failedRules: [`TURNOVER: ${decisionReason}`],
-                matchedBonusRule: null,
-                skippedReason: 'Çevrim kontrolü başarısız olduğu için kural motoru atlandı'
+                    rules: [{ name: 'SYSTEM_ERROR', passed: false, detail: ruleErr.message, category: 'SYSTEM' }],
+                    passedCount: 0,
+                    failedCount: 1,
+                    totalCount: 1
+                }
             };
         }
 
         // CRITICAL: Sync turnoverRes.decision with final botDecision
-        // This ensures detail page shows same decision as list page
         turnoverRes.decision = botDecision;
         turnoverRes.decisionReason = decisionReason;
 

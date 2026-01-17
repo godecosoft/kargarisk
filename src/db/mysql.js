@@ -255,6 +255,69 @@ async function runMigrations() {
         }
 
         console.log('[DB] Migrations completed - all tables ready including auto_approvals');
+
+        // ============================================
+        // UNIFIED RULES TABLE (New RuleEngine System)
+        // ============================================
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS unified_rules (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                rule_key VARCHAR(50) NOT NULL,
+                rule_name VARCHAR(100),
+                rule_description TEXT,
+                category ENUM('GENERAL', 'NORMAL', 'BONUS', 'CASHBACK', 'FREESPIN') NOT NULL,
+                bonus_rule_id INT NULL,
+                config JSON NOT NULL,
+                is_enabled BOOLEAN DEFAULT TRUE,
+                is_critical BOOLEAN DEFAULT FALSE,
+                priority INT DEFAULT 100,
+                site_id INT DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY unique_rule_per_site (rule_key, category, site_id, bonus_rule_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
+
+        // Seed unified rules if table is empty
+        const [ruleCount] = await pool.query('SELECT COUNT(*) as cnt FROM unified_rules');
+        if (ruleCount[0].cnt === 0) {
+            console.log('[DB] Seeding unified_rules with default rules...');
+            const unifiedRules = [
+                // GENERAL
+                ['MAX_AMOUNT', 'Maksimum Çekim Limiti', 'Tek seferde çekilebilecek max tutar', 'GENERAL', '{"max_value": 5000}', true, 10],
+                ['FORBIDDEN_GAMES', 'Yasaklı Oyunlar', 'Yasaklı oyun kontrolü', 'GENERAL', '{"patterns": ["jetx", "aviator", "spaceman", "crash", "plinko"]}', true, 20],
+                ['IP_RISK_CHECK', 'Çoklu Hesap Kontrolü', 'Aynı IP çoklu hesap', 'GENERAL', '{"max_accounts_per_ip": 2}', true, 30],
+                ['SPIN_HOARDING', 'Spin Gömme Tespiti', 'Bahissiz kazanç tespiti', 'GENERAL', '{"enabled": true}', true, 40],
+                // NORMAL
+                ['REQUIRE_DEPOSIT_TODAY', 'Bugün Yatırım Zorunlu', 'Aynı gün yatırım', 'NORMAL', '{"required": true}', true, 100],
+                ['NO_BONUS_AFTER_DEPOSIT', 'Yatırım Sonrası Bonus Yok', 'Yatırım sonrası bonus kontrolü', 'NORMAL', '{"time_window_minutes": 60}', true, 110],
+                ['NO_FREESPIN_BONUS', 'FreeSpin Kontrolü', 'FreeSpin işlemi yok', 'NORMAL', '{"reject_if_found": true}', true, 120],
+                ['TURNOVER_MULTIPLIER', 'Çevrim Katı', 'Yatırım x çevrim', 'NORMAL', '{"multiplier": 1}', true, 130],
+                ['MAX_WITHDRAWAL_RATIO', 'Max Çekim/Yatırım Oranı', 'Çekim/yatırım oranı', 'NORMAL', '{"max_ratio": 30}', true, 140],
+                // CASHBACK
+                ['CASHBACK_AUTO_APPROVE', 'Cashback Oto-Onay', 'Cashback oto-onay', 'CASHBACK', '{"enabled": false}', false, 200],
+                ['CASHBACK_MAX_AMOUNT', 'Cashback Max Limit', 'Cashback limit', 'CASHBACK', '{"max_value": 1000}', true, 210],
+                ['CASHBACK_NO_TURNOVER', 'Cashback Çevrim Yok', 'Çevrim atla', 'CASHBACK', '{"skip_turnover": true}', true, 220],
+                // FREESPIN
+                ['FREESPIN_AUTO_APPROVE', 'FreeSpin Oto-Onay', 'FreeSpin oto-onay', 'FREESPIN', '{"enabled": false}', false, 300]
+            ];
+
+            for (const [key, name, desc, category, config, enabled, priority] of unifiedRules) {
+                await pool.query(`
+                    INSERT INTO unified_rules (rule_key, rule_name, rule_description, category, config, is_enabled, priority)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                `, [key, name, desc, category, config, enabled, priority]);
+            }
+            console.log('[DB] Unified rules seeded successfully');
+        }
+
+        // Add rule_evaluation column to withdrawals if not exists
+        try {
+            await pool.query('ALTER TABLE withdrawals ADD COLUMN rule_evaluation JSON NULL AFTER decision_reason');
+        } catch (e) {
+            if (e.errno !== 1060) console.error('[DB] rule_evaluation column:', e.message);
+        }
+
     } catch (error) {
         console.error('[DB] Migration hatası:', error.message);
     }

@@ -407,6 +407,39 @@ app.get('/api/withdrawal/:withdrawalId/snapshot', async (req, res) => {
 });
 
 /**
+ * POST /api/withdrawal/:withdrawalId/reprocess
+ * Delete old snapshot and re-create with fresh rule evaluation
+ */
+app.post('/api/withdrawal/:withdrawalId/reprocess', async (req, res) => {
+    try {
+        const withdrawalId = parseInt(req.params.withdrawalId);
+        const { withdrawal } = req.body; // Frontend should send the withdrawal object
+
+        if (!withdrawal) {
+            return res.status(400).json({ success: false, error: 'Withdrawal object required in body' });
+        }
+
+        logger.info(`[Reprocess] Reprocessing snapshot for withdrawal ${withdrawalId}`);
+
+        // Delete old snapshot first
+        const pool = require('./db/mysql').getPool();
+        if (pool) {
+            await pool.query('DELETE FROM withdrawals WHERE id = ?', [withdrawalId]);
+            logger.info(`[Reprocess] Deleted old snapshot for ${withdrawalId}`);
+        }
+
+        // Create new snapshot with fresh data
+        const result = await snapshotService.createSnapshot(withdrawal);
+
+        logger.info(`[Reprocess] New snapshot created for ${withdrawalId}:`, result);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        logger.error('Reprocess error', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
  * GET /api/decisions/:withdrawalId
  * Get single withdrawal decision
  */
@@ -640,6 +673,103 @@ app.delete('/api/bonus-rules/:id', async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         logger.error('API Error: Delete bonus rule', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ============================================
+// UNIFIED RULES API ENDPOINTS
+// ============================================
+const unifiedRulesService = require('./services/unifiedRulesService');
+
+/**
+ * GET /api/rules
+ * Get all rules (with optional filtering)
+ */
+app.get('/api/rules', async (req, res) => {
+    try {
+        const { category, site_id, is_enabled } = req.query;
+        const rules = await unifiedRulesService.getRules({
+            category,
+            siteId: site_id || 1,
+            isEnabled: is_enabled !== undefined ? is_enabled === 'true' : undefined
+        });
+        res.json({ success: true, rules });
+    } catch (error) {
+        logger.error('Get rules error', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * GET /api/rules/:id
+ * Get single rule
+ */
+app.get('/api/rules/:id', async (req, res) => {
+    try {
+        const rule = await unifiedRulesService.getRule(parseInt(req.params.id));
+        if (!rule) {
+            return res.status(404).json({ success: false, error: 'Rule not found' });
+        }
+        res.json({ success: true, rule });
+    } catch (error) {
+        logger.error('Get rule error', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST /api/rules
+ * Create new rule
+ */
+app.post('/api/rules', async (req, res) => {
+    try {
+        const rule = await unifiedRulesService.createRule(req.body);
+        res.json({ success: true, rule });
+    } catch (error) {
+        logger.error('Create rule error', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * PUT /api/rules/:id
+ * Update rule
+ */
+app.put('/api/rules/:id', async (req, res) => {
+    try {
+        const rule = await unifiedRulesService.updateRule(parseInt(req.params.id), req.body);
+        res.json({ success: true, rule });
+    } catch (error) {
+        logger.error('Update rule error', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * DELETE /api/rules/:id
+ * Delete rule
+ */
+app.delete('/api/rules/:id', async (req, res) => {
+    try {
+        await unifiedRulesService.deleteRule(parseInt(req.params.id));
+        res.json({ success: true });
+    } catch (error) {
+        logger.error('Delete rule error', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST /api/rules/:id/toggle
+ * Toggle rule enabled status
+ */
+app.post('/api/rules/:id/toggle', async (req, res) => {
+    try {
+        const rule = await unifiedRulesService.toggleRule(parseInt(req.params.id));
+        res.json({ success: true, rule });
+    } catch (error) {
+        logger.error('Toggle rule error', { error: error.message });
         res.status(500).json({ success: false, error: error.message });
     }
 });

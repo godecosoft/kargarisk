@@ -936,35 +936,78 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                                 </div>
                             )}
 
-                            {/* Passed Rules */}
-                            {ruleEvaluation?.passedRules?.length > 0 && (
-                                <div className="summary-section passed-rules">
-                                    <div className="section-label">✅ Geçen Kurallar ({ruleEvaluation.passedRules.length})</div>
-                                    <div className="rules-list">
-                                        {ruleEvaluation.passedRules.map((rule, i) => (
-                                            <div key={i} className="rule-item passed">
-                                                <CheckCircle size={14} /> {rule}
-                                            </div>
-                                        ))}
+                            {/* Passed Rules - Support both old and new format */}
+                            {(() => {
+                                // New format: ruleEvaluation.rules is an array of {name, passed, detail}
+                                const rulesArray = ruleEvaluation?.rules || [];
+                                const passedRules = rulesArray.filter(r => r.passed);
+                                // Fallback to old format
+                                const oldPassedRules = ruleEvaluation?.passedRules || [];
+
+                                const displayRules = passedRules.length > 0 ? passedRules : oldPassedRules.map(r => ({ name: r, detail: r }));
+
+                                if (displayRules.length === 0) return null;
+
+                                return (
+                                    <div className="summary-section passed-rules">
+                                        <div className="section-label">✅ Geçen Kurallar ({displayRules.length})</div>
+                                        <div className="rules-list">
+                                            {displayRules.map((rule, i) => (
+                                                <div key={i} className="rule-item passed">
+                                                    <CheckCircle size={14} />
+                                                    <span className="rule-name">{rule.displayName || rule.name}</span>
+                                                    {rule.detail && <span className="rule-detail">{rule.detail}</span>}
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
+                                );
+                            })()}
+
+                            {/* Failed Rules - Support both old and new format */}
+                            {(() => {
+                                const rulesArray = ruleEvaluation?.rules || [];
+                                const failedRules = rulesArray.filter(r => !r.passed);
+                                // Fallback to old format
+                                const oldFailedRules = ruleEvaluation?.failedRules || [];
+
+                                const displayRules = failedRules.length > 0 ? failedRules : oldFailedRules.map(r => ({ name: r, detail: r }));
+
+                                if (displayRules.length === 0) return null;
+
+                                return (
+                                    <div className="summary-section failed-rules">
+                                        <div className="section-label">❌ Başarısız Kurallar ({displayRules.length})</div>
+                                        <div className="rules-list">
+                                            {displayRules.map((rule, i) => (
+                                                <div key={i} className={`rule-item failed ${rule.critical ? 'critical' : ''}`}>
+                                                    <XCircle size={14} />
+                                                    <span className="rule-name">{rule.displayName || rule.name}</span>
+                                                    {rule.detail && <span className="rule-detail">{rule.detail}</span>}
+                                                    {rule.critical && <span className="critical-badge">KRİTİK</span>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Rule Summary Stats */}
+                            {ruleEvaluation?.totalCount > 0 && (
+                                <div className="summary-section rule-stats">
+                                    <div className="section-label">📊 Kural Özeti</div>
+                                    <div className="stats-row">
+                                        <div className="stat passed">✅ {ruleEvaluation.passedCount || 0} geçti</div>
+                                        <div className="stat failed">❌ {ruleEvaluation.failedCount || 0} kaldı</div>
+                                        <div className="stat total">📋 {ruleEvaluation.totalCount || 0} toplam</div>
+                                    </div>
+                                    {ruleEvaluation.withdrawalType && (
+                                        <div className="withdrawal-type">Çekim Tipi: <strong>{ruleEvaluation.withdrawalType}</strong></div>
+                                    )}
                                 </div>
                             )}
 
-                            {/* Failed Rules */}
-                            {ruleEvaluation?.failedRules?.length > 0 && (
-                                <div className="summary-section failed-rules">
-                                    <div className="section-label">❌ Başarısız Kurallar ({ruleEvaluation.failedRules.length})</div>
-                                    <div className="rules-list">
-                                        {ruleEvaluation.failedRules.map((rule, i) => (
-                                            <div key={i} className="rule-item failed">
-                                                <XCircle size={14} /> {rule}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* No Rule Data - Show debug info */}
+                            {/* No Rule Data - Show debug info and reprocess button */}
                             {!ruleEvaluation && (
                                 <div className="summary-section no-data">
                                     <div className="section-label">ℹ️ Kural Verisi</div>
@@ -977,6 +1020,32 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                                         <div>Çevrim Tamamlandı: {turnover?.turnover?.isComplete ? 'Evet' : 'Hayır'}</div>
                                         <div>DecisionData var: {turnover?.decisionData ? 'Evet' : 'Hayır'}</div>
                                     </div>
+                                    <button
+                                        className="reprocess-btn"
+                                        onClick={async () => {
+                                            try {
+                                                const { reprocessWithdrawalSnapshot } = await import('../services/api');
+                                                await reprocessWithdrawalSnapshot(withdrawal.Id, withdrawal);
+                                                alert('Snapshot yeniden işlendi! Sayfa yenilenecek.');
+                                                window.location.reload();
+                                            } catch (err) {
+                                                alert('Hata: ' + err.message);
+                                            }
+                                        }}
+                                        style={{
+                                            marginTop: '12px',
+                                            padding: '8px 16px',
+                                            background: 'var(--accent-primary)',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '6px',
+                                            cursor: 'pointer',
+                                            fontSize: '12px',
+                                            fontWeight: '600'
+                                        }}
+                                    >
+                                        🔄 Yeniden İşle
+                                    </button>
                                 </div>
                             )}
                         </div>
@@ -1384,6 +1453,28 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                 /* Simulation Warning */
                 .simulation-warning { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); }
                 .simulation-text { font-size: 13px; color: #f59e0b; }
+
+                /* New Rule Engine Styles */
+                .rule-name { font-weight: 600; flex-shrink: 0; }
+                .rule-detail { font-size: 11px; opacity: 0.8; margin-left: 8px; }
+                .rule-item.failed.critical { background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; }
+                .critical-badge { 
+                    font-size: 10px; 
+                    background: #ef4444; 
+                    color: white; 
+                    padding: 2px 6px; 
+                    border-radius: 4px; 
+                    margin-left: auto;
+                    font-weight: 600;
+                }
+                .rule-stats { background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); }
+                .stats-row { display: flex; gap: 16px; flex-wrap: wrap; }
+                .stats-row .stat { font-size: 14px; font-weight: 500; }
+                .stats-row .stat.passed { color: #22c55e; }
+                .stats-row .stat.failed { color: #ef4444; }
+                .stats-row .stat.total { color: var(--text-muted); }
+                .withdrawal-type { margin-top: 8px; font-size: 13px; color: var(--text-muted); }
+                .withdrawal-type strong { color: var(--accent-primary); }
             `}</style>
         </div>
     );

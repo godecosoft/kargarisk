@@ -125,6 +125,16 @@ export async function fetchWithdrawalSnapshot(withdrawalId) {
     return response.json();
 }
 
+export async function reprocessWithdrawalSnapshot(withdrawalId, withdrawal) {
+    const response = await fetch(`${API_BASE}/withdrawal/${withdrawalId}/reprocess`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ withdrawal })
+    });
+    if (!response.ok) throw new Error('Failed to reprocess snapshot');
+    return response.json();
+}
+
 export async function fetchClientKpi(clientId) {
     const response = await fetch(`${API_BASE}/client/${clientId}/kpi`);
     if (!response.ok) throw new Error('Failed to fetch client KPI');

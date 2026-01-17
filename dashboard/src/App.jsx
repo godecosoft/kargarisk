@@ -8,6 +8,7 @@ import ReportsPage from './pages/ReportsPage';
 import RuleEnginePage from './pages/RuleEnginePage';
 import AutoApprovalHistoryPage from './pages/AutoApprovalHistoryPage';
 import BonusRulesPage from './pages/BonusRulesPage';
+import RulesPage from './pages/RulesPage';
 import './index.css';
 
 function App() {
@@ -39,6 +40,8 @@ function App() {
         return <ReportsPage />;
       case 'rules':
         return <RuleEnginePage />;
+      case 'unified-rules':
+        return <RulesPage />;
       case 'bonus-rules':
         return <BonusRulesPage />;
       case 'auto-history':

@@ -28,7 +28,8 @@ function Sidebar({ currentPage, onNavigate }) {
         {
             section: 'Yönetim',
             items: [
-                { id: 'rules', icon: Shield, label: 'Kural Motoru' },
+                { id: 'unified-rules', icon: Settings, label: 'Kural Yönetimi' },
+                { id: 'rules', icon: Shield, label: 'Kural Motoru (Eski)' },
                 { id: 'bonus-rules', icon: Gift, label: 'Bonus Kuralları' },
                 { id: 'auto-history', icon: CheckCircle, label: 'Oto-Onay Geçmişi' },
                 { id: 'logs', icon: FileText, label: 'İşlem Logları' },
