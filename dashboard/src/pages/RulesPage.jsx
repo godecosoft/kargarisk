@@ -11,12 +11,122 @@ const CATEGORIES = {
     'FREESPIN': { name: 'FreeSpin Kuralları', icon: '🎰', color: '#ec4899', desc: 'FreeSpin çekimleri' }
 };
 
+const RULE_TEMPLATES = {
+    'MAX_AMOUNT': {
+        name: 'Maksimum Çekim Limiti',
+        desc: 'Tek seferde çekilebilecek maksimum tutarı belirler.',
+        category: 'GENERAL',
+        fields: [
+            { key: 'max_value', type: 'number', label: 'Limit (TL)', default: 5000 }
+        ]
+    },
+    'FORBIDDEN_GAMES': {
+        name: 'Yasaklı Oyunlar',
+        desc: 'Oynanması yasak olan oyunları (kelime bazlı) engeller.',
+        category: 'GENERAL',
+        fields: [
+            { key: 'patterns', type: 'tags', label: 'Yasaklı Kelimeler', default: ['jetx', 'aviator'], placeholder: 'Örn: aviator, jetx, roulette' }
+        ]
+    },
+    'IP_RISK_CHECK': {
+        name: 'Çoklu Hesap Kontrolü (IP)',
+        desc: 'Aynı IP adresinden bağlanan maksimum hesap sayısını sınırlar.',
+        category: 'GENERAL',
+        fields: [
+            { key: 'max_accounts_per_ip', type: 'number', label: 'Max Hesap Sayısı', default: 2 }
+        ]
+    },
+    'SPIN_HOARDING': {
+        name: 'Spin Gömme Tespiti',
+        desc: 'Bahis yapmadan kazanç (spin hoarding) taktiğini tespit eder.',
+        category: 'GENERAL',
+        fields: [
+            { key: 'enabled', type: 'boolean', label: 'Kontrol Aktif', default: true }
+        ]
+    },
+    'REQUIRE_DEPOSIT_TODAY': {
+        name: 'Günlük Yatırım Şartı',
+        desc: 'Çekim yapmak için aynı gün içinde yatırım yapılmış olmasını zorunlu kılar.',
+        category: 'NORMAL',
+        fields: [
+            { key: 'required', type: 'boolean', label: 'Aktif', default: true }
+        ]
+    },
+    'NO_BONUS_AFTER_DEPOSIT': {
+        name: 'Yatırım Sonrası Bonus Kontrolü',
+        desc: 'Yatırım yapıldıktan sonra bonus alınıp alınmadığını kontrol eder.',
+        category: 'NORMAL',
+        fields: [
+            { key: 'time_window_minutes', type: 'number', label: 'Kontrol Süresi (Dakika)', default: 60 }
+        ]
+    },
+    'NO_FREESPIN_BONUS': {
+        name: 'FreeSpin/Bonus Kullanımı',
+        desc: 'Normal çekimlerde FreeSpin veya Bonus kullanımı varsa reddeder.',
+        category: 'NORMAL',
+        fields: [
+            { key: 'reject_if_found', type: 'boolean', label: 'Varsa Reddet', default: true }
+        ]
+    },
+    'TURNOVER_MULTIPLIER': {
+        name: 'Ana Para Çevrim Şartı',
+        desc: 'Yatırım tutarının belirli bir katı kadar çevrim yapılmasını ister.',
+        category: 'NORMAL',
+        fields: [
+            { key: 'multiplier', type: 'number', label: 'Çevrim Katı (x)', default: 1 }
+        ]
+    },
+    'MAX_WITHDRAWAL_RATIO': {
+        name: 'Yatırım/Çekim Oranı',
+        desc: 'Çekim tutarı, son yatırımın belirli bir katından fazla olamaz.',
+        category: 'NORMAL',
+        fields: [
+            { key: 'max_ratio', type: 'number', label: 'Max Oran (x)', default: 30 }
+        ]
+    },
+    'CASHBACK_AUTO_APPROVE': {
+        name: 'Cashback Oto-Onay',
+        desc: 'Cashback çekimlerini otomatik onaylar.',
+        category: 'CASHBACK',
+        fields: [
+            { key: 'enabled', type: 'boolean', label: 'Oto-Onay Aktif', default: false }
+        ]
+    },
+    'CASHBACK_MAX_AMOUNT': {
+        name: 'Cashback Limit',
+        desc: 'Cashback çekimleri için maksimum tutar limiti.',
+        category: 'CASHBACK',
+        fields: [
+            { key: 'max_value', type: 'number', label: 'Limit (TL)', default: 1000 }
+        ]
+    },
+    'CASHBACK_NO_TURNOVER': {
+        name: 'Cashback Çevrim Muafiyeti',
+        desc: 'Cashback çekimlerinde çevrim şartını devre dışı bırakır.',
+        category: 'CASHBACK',
+        fields: [
+            { key: 'skip_turnover', type: 'boolean', label: 'Çevrim Aranmasın', default: true }
+        ]
+    },
+    'FREESPIN_AUTO_APPROVE': {
+        name: 'FreeSpin Oto-Onay',
+        desc: 'FreeSpin çekimlerini otomatik onaylar.',
+        category: 'FREESPIN',
+        fields: [
+            { key: 'enabled', type: 'boolean', label: 'Oto-Onay Aktif', default: false }
+        ]
+    }
+};
+
 export default function RulesPage() {
     const [rules, setRules] = useState([]);
     const [loading, setLoading] = useState(true);
     const [expandedCategories, setExpandedCategories] = useState(['GENERAL', 'NORMAL']);
     const [editingRule, setEditingRule] = useState(null);
     const [saving, setSaving] = useState(false);
+
+    // Template selection state for new rules
+    const [selectedTemplateKey, setSelectedTemplateKey] = useState(null);
 
     useEffect(() => {
         loadRules();
@@ -39,6 +149,54 @@ export default function RulesPage() {
                 ? prev.filter(c => c !== category)
                 : [...prev, category]
         );
+    };
+
+    const handleCreateNew = () => {
+        // Default to first available template
+        const defaultKey = 'MAX_AMOUNT';
+        const template = RULE_TEMPLATES[defaultKey];
+
+        setSelectedTemplateKey(defaultKey);
+
+        // Initialize config with defaults
+        const initialConfig = {};
+        template.fields.forEach(f => {
+            initialConfig[f.key] = f.default;
+        });
+
+        setEditingRule({
+            rule_key: defaultKey,
+            rule_name: template.name,
+            rule_description: template.desc,
+            category: template.category,
+            config: initialConfig,
+            is_enabled: true
+        });
+    };
+
+    const handleTemplateChange = (key) => {
+        const template = RULE_TEMPLATES[key];
+        setSelectedTemplateKey(key);
+
+        // Preserve existing config values if key matches, otherwise reset to defaults
+        const newConfig = {};
+        template.fields.forEach(f => {
+            newConfig[f.key] = f.default;
+        });
+
+        setEditingRule(prev => ({
+            ...prev,
+            rule_key: key,
+            rule_name: template.name,
+            rule_description: template.desc,
+            category: template.category, // Auto switch category based on template
+            config: newConfig
+        }));
+    };
+
+    const handleEdit = (rule) => {
+        setSelectedTemplateKey(rule.rule_key);
+        setEditingRule({ ...rule });
     };
 
     const toggleRule = async (ruleId) => {
@@ -76,6 +234,7 @@ export default function RulesPage() {
                     setRules(prev => prev.map(r => r.id === data.rule.id ? data.rule : r));
                 }
                 setEditingRule(null);
+                setSelectedTemplateKey(null); // Clear selected template after saving
             }
         } catch (e) {
             console.error('Save failed:', e);
@@ -102,6 +261,51 @@ export default function RulesPage() {
         return acc;
     }, {});
 
+    const renderConfigField = (field, config, onChange) => {
+        if (field.type === 'boolean') {
+            return (
+                <div key={field.key} className="form-group checkbox-group">
+                    <label>
+                        <input
+                            type="checkbox"
+                            checked={config[field.key] || false}
+                            onChange={e => onChange(field.key, e.target.checked)}
+                        />
+                        {field.label}
+                    </label>
+                </div>
+            );
+        }
+
+        if (field.type === 'tags') {
+            const value = Array.isArray(config[field.key]) ? config[field.key].join(', ') : (config[field.key] || '');
+            return (
+                <div key={field.key} className="form-group">
+                    <label>{field.label}</label>
+                    <input
+                        type="text"
+                        value={value}
+                        onChange={e => onChange(field.key, e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                        placeholder={field.placeholder}
+                    />
+                    <small className="field-hint">Virgül ile ayırarak birden fazla girebilirsiniz</small>
+                </div>
+            );
+        }
+
+        return (
+            <div key={field.key} className="form-group">
+                <label>{field.label}</label>
+                <input
+                    type={field.type}
+                    value={config[field.key] || ''}
+                    onChange={e => onChange(field.key, field.type === 'number' ? parseFloat(e.target.value) : e.target.value)}
+                    placeholder={field.placeholder}
+                />
+            </div>
+        );
+    };
+
     if (loading) return <div className="loading-page"><div className="spinner"></div></div>;
 
     return (
@@ -111,7 +315,7 @@ export default function RulesPage() {
                     <Settings size={24} />
                     <h1>Kural Yönetimi</h1>
                 </div>
-                <button className="add-btn" onClick={() => setEditingRule({ category: 'GENERAL', config: {}, is_enabled: true })}>
+                <button className="add-btn" onClick={handleCreateNew}>
                     <Plus size={16} /> Yeni Kural
                 </button>
             </div>
@@ -154,7 +358,7 @@ export default function RulesPage() {
                                                     {rule.is_critical && <span className="critical-badge">Kritik</span>}
                                                 </div>
                                                 <div className="rule-name">{rule.rule_name}</div>
-                                                <div className="rule-config">
+                                                <div className="rule-config-preview">
                                                     {Object.entries(rule.config || {}).map(([k, v]) => (
                                                         <span key={k} className="config-item">
                                                             {k}: <strong>{JSON.stringify(v)}</strong>
@@ -172,7 +376,7 @@ export default function RulesPage() {
                                                 </button>
                                                 <button
                                                     className="edit-btn"
-                                                    onClick={() => setEditingRule(rule)}
+                                                    onClick={() => handleEdit(rule)}
                                                     title="Düzenle"
                                                 >
                                                     <Edit size={16} />
@@ -205,66 +409,68 @@ export default function RulesPage() {
                             </button>
                         </div>
                         <div className="modal-body">
+                            {/* Template Selection Rule Type */}
                             <div className="form-group">
-                                <label>Kural Key (benzersiz)</label>
-                                <input
-                                    type="text"
-                                    value={editingRule.rule_key || ''}
-                                    onChange={e => setEditingRule({ ...editingRule, rule_key: e.target.value.toUpperCase() })}
-                                    placeholder="MAX_AMOUNT"
-                                    disabled={!!editingRule.id}
-                                />
+                                <label>Kural Tipi</label>
+                                <select
+                                    value={selectedTemplateKey || ''}
+                                    onChange={e => handleTemplateChange(e.target.value)}
+                                    disabled={!!editingRule.id} // Cannot change type of existing rule
+                                >
+                                    {Object.entries(RULE_TEMPLATES).map(([key, tpl]) => (
+                                        <option key={key} value={key}>{tpl.name} ({key})</option>
+                                    ))}
+                                </select>
                             </div>
+
                             <div className="form-group">
-                                <label>Kural Adı</label>
+                                <label>Görünen Ad</label>
                                 <input
                                     type="text"
                                     value={editingRule.rule_name || ''}
                                     onChange={e => setEditingRule({ ...editingRule, rule_name: e.target.value })}
-                                    placeholder="Maksimum Çekim Limiti"
                                 />
                             </div>
+
                             <div className="form-group">
                                 <label>Açıklama</label>
                                 <textarea
                                     value={editingRule.rule_description || ''}
                                     onChange={e => setEditingRule({ ...editingRule, rule_description: e.target.value })}
-                                    placeholder="Kural açıklaması..."
+                                    rows={2}
                                 />
                             </div>
-                            <div className="form-group">
-                                <label>Kategori</label>
-                                <select
-                                    value={editingRule.category || 'GENERAL'}
-                                    onChange={e => setEditingRule({ ...editingRule, category: e.target.value })}
-                                >
-                                    {Object.entries(CATEGORIES).filter(([k]) => k !== 'BONUS').map(([k, v]) => (
-                                        <option key={k} value={k}>{v.name}</option>
-                                    ))}
-                                </select>
+
+                            <div className="config-section">
+                                <h3>⚙️ Ayarlar</h3>
+                                {selectedTemplateKey && RULE_TEMPLATES[selectedTemplateKey] ? (
+                                    <div className="dynamic-fields">
+                                        {RULE_TEMPLATES[selectedTemplateKey].fields.map(field =>
+                                            renderConfigField(field, editingRule.config || {}, (key, value) => {
+                                                setEditingRule(prev => ({
+                                                    ...prev,
+                                                    config: { ...prev.config, [key]: value }
+                                                }));
+                                            })
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="legacy-config">
+                                        <label>JSON Konfigürasyon (Özel)</label>
+                                        <textarea
+                                            value={JSON.stringify(editingRule.config || {}, null, 2)}
+                                            onChange={e => {
+                                                try {
+                                                    setEditingRule({ ...editingRule, config: JSON.parse(e.target.value) });
+                                                } catch { }
+                                            }}
+                                            className="json-input"
+                                        />
+                                    </div>
+                                )}
                             </div>
-                            <div className="form-group">
-                                <label>Konfigürasyon (JSON)</label>
-                                <textarea
-                                    value={JSON.stringify(editingRule.config || {}, null, 2)}
-                                    onChange={e => {
-                                        try {
-                                            setEditingRule({ ...editingRule, config: JSON.parse(e.target.value) });
-                                        } catch { }
-                                    }}
-                                    placeholder='{"max_value": 5000}'
-                                    className="json-input"
-                                />
-                            </div>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Öncelik</label>
-                                    <input
-                                        type="number"
-                                        value={editingRule.priority || 100}
-                                        onChange={e => setEditingRule({ ...editingRule, priority: parseInt(e.target.value) })}
-                                    />
-                                </div>
+
+                            <div className="form-row" style={{ marginTop: '20px' }}>
                                 <div className="form-group checkbox-group">
                                     <label>
                                         <input
@@ -274,15 +480,26 @@ export default function RulesPage() {
                                         />
                                         Aktif
                                     </label>
+                                </div>
+                                <div className="form-group checkbox-group">
                                     <label>
                                         <input
                                             type="checkbox"
                                             checked={editingRule.is_critical}
                                             onChange={e => setEditingRule({ ...editingRule, is_critical: e.target.checked })}
                                         />
-                                        Kritik (fail = RET)
+                                        Kritik (Başarısız olursa direkt RED ver)
                                     </label>
                                 </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label>Öncelik (Küçük numara önce çalışır)</label>
+                                <input
+                                    type="number"
+                                    value={editingRule.priority || 100}
+                                    onChange={e => setEditingRule({ ...editingRule, priority: parseInt(e.target.value) })}
+                                />
                             </div>
                         </div>
                         <div className="modal-footer">

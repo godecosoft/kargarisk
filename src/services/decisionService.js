@@ -7,9 +7,8 @@
 const db = require('../db/mysql');
 const turnoverService = require('./turnoverService');
 const sportsService = require('./sportsService');
-const autoApprovalService = require('./autoApprovalService');
-const bonusRulesService = require('./bonusRulesService');
-const riskService = require('./riskService');
+// autoApprovalService, bonusRulesService, and riskService are now handled by Unified Rule Engine
+
 
 /**
  * Get decision for a withdrawal
@@ -135,6 +134,9 @@ async function getDecisionsBatch(withdrawals) {
     }
 }
 
+const RuleEngine = require('./ruleEngine');
+const { loadBonusRules } = require('./ruleEngine/ruleLoader');
+
 /**
  * Calculate decision based on turnover, sports data, Rule Engine and Bonus Rules
  * This simulates the full auto-approval logic WITHOUT actually calling BC API
@@ -167,13 +169,12 @@ async function calculateDecision(clientId, withdrawalAmount, withdrawalObject = 
             reason = 'Yatırım öncesi kazançlı spor kuponu tespit edildi';
         }
 
-        // If turnover says ONAY, run full auto-approval simulation
-        // NOTE: We evaluate rules REGARDLESS of AUTO_APPROVAL_ENABLED toggle
-        // This lets us see what decision WOULD be, even if auto-approval is off
+        // If turnover says ONAY, run full rule engine evaluation
         if (decision === 'ONAY') {
             try {
-                // Get auto-approval rules
-                const rules = await autoApprovalService.getRules();
+                // Instantiate Rule Engine
+                const ruleEngine = new RuleEngine(1); // Default site_id = 1
+                const bonusRules = await loadBonusRules();
 
                 // Fetch bonus data for complete rule evaluation
                 let bonuses = [];
@@ -231,7 +232,8 @@ async function calculateDecision(clientId, withdrawalAmount, withdrawalObject = 
                     turnover: turnoverReport,
                     bonuses: bonuses,
                     bonusTransactions: bonusTransactions,
-                    sports: sportsReport
+                    sports: sportsReport,
+                    ipAnalysis: { relatedAccounts: [] } // Default empty IP analysis for decision service
                 };
 
                 // Build withdrawal-like object
@@ -241,47 +243,17 @@ async function calculateDecision(clientId, withdrawalAmount, withdrawalObject = 
                     Amount: withdrawalAmount || 0
                 };
 
-                // RISK ANALYSIS
-                const riskAnalysis = riskService.analyzeRisk(withdrawal, snapshotData);
-                if (riskAnalysis.isRisky && riskAnalysis.totalRiskLevel === 'HIGH') {
+                // EVALUATE WITH UNIFIED RULE ENGINE
+                const ruleEvaluation = await ruleEngine.evaluate(withdrawal, snapshotData, bonusRules);
+
+                if (ruleEvaluation.decision === 'RET' || ruleEvaluation.decision === 'MANUEL') {
                     decision = 'MANUEL';
-                    reason = `RISK TESPİT: ${riskAnalysis.details?.join(', ') || 'Spin gömme şüphesi'}`;
-                    ruleDetails.push(`RISK: ${riskAnalysis.totalRiskLevel}`);
+                    reason = ruleEvaluation.reason;
+                    ruleDetails = ruleEvaluation.failedRules || [];
                 } else {
-                    // CHECK BONUS RULES (if applicable)
-                    const withdrawalType = turnoverReport.withdrawalType?.type;
-                    const isBonusOrFreeSpin = withdrawalType === 'BONUS' || withdrawalType === 'FREESPIN';
-                    let matchedBonusRule = null;
-
-                    if (isBonusOrFreeSpin) {
-                        const bonusTransaction = turnoverReport.deposit || {};
-                        matchedBonusRule = await bonusRulesService.findMatchingRule(bonusTransaction);
-
-                        if (!matchedBonusRule) {
-                            decision = 'MANUEL';
-                            reason = 'Tanımlı bonus kuralı bulunamadı';
-                            ruleDetails.push('BONUS_RULE: Eşleşen kural yok');
-                        }
-                    }
-
-                    // EVALUATE RULES (only if still ONAY)
-                    if (decision === 'ONAY') {
-                        const ruleResult = autoApprovalService.evaluateRules(
-                            withdrawal,
-                            snapshotData,
-                            rules,
-                            matchedBonusRule
-                        );
-
-                        if (!ruleResult.passed) {
-                            decision = 'MANUEL';
-                            reason = ruleResult.failedRules.join(', ');
-                            ruleDetails = ruleResult.failedRules;
-                        } else {
-                            ruleDetails = ruleResult.passedRules;
-                        }
-                    }
+                    ruleDetails = ruleEvaluation.passedRules || [];
                 }
+
             } catch (ruleError) {
                 console.error('[DecisionService] Rule evaluation error:', ruleError.message);
                 // Don't change decision on rule error, just log
