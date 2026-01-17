@@ -118,6 +118,8 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
     const [expandedIps, setExpandedIps] = useState({}); // Accordion için
     const [showDecisionModal, setShowDecisionModal] = useState(false); // Karar Özeti modal
     const [ruleEvaluation, setRuleEvaluation] = useState(null); // Kural değerlendirme verisi
+    const [snapshotDecision, setSnapshotDecision] = useState(null); // Final karar (snapshot botDecision)
+    const [snapshotReason, setSnapshotReason] = useState(null); // Karar sebebi (snapshot)
 
     // Load all data
     useEffect(() => {
@@ -147,6 +149,10 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                     setBonuses(snapshot.bonuses || []);
                     setBonusTx(snapshot.bonusTransactions?.data || []);
                     setIpAnalysis(snapshot.ipAnalysis);
+
+                    // SET FINAL DECISION from snapshot's botDecision (after rule engine)
+                    setSnapshotDecision(snapshot.botDecision);
+                    setSnapshotReason(snapshot.decisionReason);
 
                     // SET RULE EVALUATION - try multiple sources
                     const ruleData = snapshot.ruleEvaluation
@@ -189,8 +195,9 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
 
     if (!withdrawal) return null;
 
-    const decision = turnover?.decision || withdrawal?.decisionData?.decision || 'MANUEL';
-    const decisionReason = turnover?.decisionReason || withdrawal?.decisionData?.reason || '';
+    // PRIORITY: snapshotDecision (final, after rule engine) > turnover.decision (initial) > fallback MANUEL
+    const decision = snapshotDecision || turnover?.decision || withdrawal?.decisionData?.decision || 'MANUEL';
+    const decisionReason = snapshotReason || turnover?.decisionReason || withdrawal?.decisionData?.reason || '';
     const casinoGames = turnover?.turnover?.casino?.games || [];
     const sportsBets = sports?.bets || [];
     const totalPercentage = turnover?.turnover?.total?.percentage || 0;

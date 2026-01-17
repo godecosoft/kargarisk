@@ -310,6 +310,16 @@ async function createSnapshot(withdrawal) {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ON DUPLICATE KEY UPDATE
                 status = VALUES(status),
+                bot_decision = VALUES(bot_decision),
+                decision_reason = VALUES(decision_reason),
+                withdrawal_type = VALUES(withdrawal_type),
+                turnover_data = VALUES(turnover_data),
+                client_data = VALUES(client_data),
+                sports_data = VALUES(sports_data),
+                bonuses_data = VALUES(bonuses_data),
+                bonus_transactions = VALUES(bonus_transactions),
+                ip_analysis = VALUES(ip_analysis),
+                checked_at = NOW(),
                 updated_at = NOW()
         `, [
             withdrawalId,
