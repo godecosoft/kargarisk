@@ -60,6 +60,23 @@ async function getSnapshot(withdrawalId) {
         if (rows.length === 0) return null;
 
         const row = rows[0];
+
+        // Parse turnover data to extract ruleEvaluation
+        let turnoverData = null;
+        let ruleEvaluation = null;
+
+        if (row.turnover_data) {
+            try {
+                turnoverData = JSON.parse(row.turnover_data);
+                // Extract ruleEvaluation from turnoverData.decisionData
+                if (turnoverData?.decisionData?.ruleEvaluation) {
+                    ruleEvaluation = turnoverData.decisionData.ruleEvaluation;
+                }
+            } catch (parseErr) {
+                logger.error('[SnapshotService] Failed to parse turnover_data:', parseErr.message);
+            }
+        }
+
         return {
             success: true,
             fromDB: true,
@@ -75,12 +92,13 @@ async function getSnapshot(withdrawalId) {
             botDecision: row.bot_decision,
             decisionReason: row.decision_reason,
             withdrawalType: row.withdrawal_type,
-            turnover: row.turnover_data ? JSON.parse(row.turnover_data) : null,
+            turnover: turnoverData,
             sports: row.sports_data ? JSON.parse(row.sports_data) : null,
             bonuses: row.bonuses_data ? JSON.parse(row.bonuses_data) : null,
             bonusTransactions: row.bonus_transactions ? JSON.parse(row.bonus_transactions) : null,
             ipAnalysis: row.ip_analysis ? JSON.parse(row.ip_analysis) : null,
             clientData: row.client_data ? JSON.parse(row.client_data) : null,
+            ruleEvaluation: ruleEvaluation, // <-- ADD THIS
             checkedAt: row.checked_at
         };
     } catch (error) {

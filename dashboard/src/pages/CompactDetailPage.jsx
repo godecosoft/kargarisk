@@ -117,6 +117,7 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
     const [loading, setLoading] = useState(true);
     const [expandedIps, setExpandedIps] = useState({}); // Accordion için
     const [showDecisionModal, setShowDecisionModal] = useState(false); // Karar Özeti modal
+    const [ruleEvaluation, setRuleEvaluation] = useState(null); // Kural değerlendirme verisi
 
     // Load all data
     useEffect(() => {
@@ -137,6 +138,8 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                     setBonuses(snapshot.bonuses || []);
                     setBonusTx(snapshot.bonusTransactions?.data || []);
                     setIpAnalysis(snapshot.ipAnalysis);
+                    // SET RULE EVALUATION from snapshot
+                    setRuleEvaluation(snapshot.ruleEvaluation || snapshot.turnover?.decisionData?.ruleEvaluation || null);
                 } else {
                     // Fallback to live API
                     const [t, s, b, bt, ip] = await Promise.all([
@@ -178,8 +181,7 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
     const sportsBets = sports?.bets || [];
     const totalPercentage = turnover?.turnover?.total?.percentage || 0;
 
-    // Rule evaluation data for Decision Summary modal
-    const ruleEvaluation = turnover?.decisionData?.ruleEvaluation || null;
+    // ruleEvaluation is now a state variable set from snapshot
 
     // SPİN GÖMME TESPİTİ
     // Backend'den gelen kronolojik kontrol sonucu
