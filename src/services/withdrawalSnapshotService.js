@@ -72,6 +72,8 @@ async function getSnapshot(withdrawalId) {
                 if (turnoverData?.decisionData?.ruleEvaluation) {
                     ruleEvaluation = turnoverData.decisionData.ruleEvaluation;
                 }
+                // DEBUG LOG
+                logger.info(`[SnapshotService] getSnapshot ${withdrawalId}: ruleEvaluation=${ruleEvaluation ? 'FOUND' : 'NULL'}, hasDecisionData=${!!turnoverData?.decisionData}`);
             } catch (parseErr) {
                 logger.error('[SnapshotService] Failed to parse turnover_data:', parseErr.message);
             }

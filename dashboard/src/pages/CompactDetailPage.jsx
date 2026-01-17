@@ -132,14 +132,28 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                 const { fetchWithdrawalSnapshot } = await import('../services/api');
                 const snapshot = await fetchWithdrawalSnapshot(withdrawal.Id);
 
+                console.log('[DEBUG] Snapshot received:', {
+                    id: withdrawal.Id,
+                    hasRuleEvaluation: !!snapshot.ruleEvaluation,
+                    hasDecisionData: !!snapshot.turnover?.decisionData,
+                    decisionDataKeys: snapshot.turnover?.decisionData ? Object.keys(snapshot.turnover.decisionData) : [],
+                    ruleEvaluation: snapshot.ruleEvaluation,
+                    turnoverDecisionData: snapshot.turnover?.decisionData?.ruleEvaluation
+                });
+
                 if (snapshot.success && snapshot.fromDB) {
                     setTurnover(snapshot.turnover);
                     setSports(snapshot.sports);
                     setBonuses(snapshot.bonuses || []);
                     setBonusTx(snapshot.bonusTransactions?.data || []);
                     setIpAnalysis(snapshot.ipAnalysis);
-                    // SET RULE EVALUATION from snapshot
-                    setRuleEvaluation(snapshot.ruleEvaluation || snapshot.turnover?.decisionData?.ruleEvaluation || null);
+
+                    // SET RULE EVALUATION - try multiple sources
+                    const ruleData = snapshot.ruleEvaluation
+                        || snapshot.turnover?.decisionData?.ruleEvaluation
+                        || null;
+                    console.log('[DEBUG] Setting ruleEvaluation:', ruleData);
+                    setRuleEvaluation(ruleData);
                 } else {
                     // Fallback to live API
                     const [t, s, b, bt, ip] = await Promise.all([
@@ -868,6 +882,37 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                                 </div>
                             )}
 
+                            {/* Turnover Summary - Always show if available */}
+                            {turnover && (
+                                <div className="summary-section turnover-summary">
+                                    <div className="section-label">📊 Çevrim Özeti</div>
+                                    <div className="turnover-stats">
+                                        <div className="stat">
+                                            <span className="label">Hedef:</span>
+                                            <span className="value">₺{(turnover?.turnover?.required || turnover?.required || 0).toLocaleString()}</span>
+                                        </div>
+                                        <div className="stat">
+                                            <span className="label">Yapılan:</span>
+                                            <span className="value">₺{(turnover?.turnover?.total?.amount || 0).toLocaleString()}</span>
+                                        </div>
+                                        <div className="stat">
+                                            <span className="label">Yüzde:</span>
+                                            <span className={`value ${(turnover?.turnover?.total?.percentage || 0) >= 100 ? 'complete' : 'incomplete'}`}>
+                                                %{turnover?.turnover?.total?.percentage || 0}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Simulation Mode Warning */}
+                            {ruleEvaluation?.simulationOnly && (
+                                <div className="summary-section simulation-warning">
+                                    <div className="section-label">⚠️ Simülasyon Modu</div>
+                                    <div className="simulation-text">Bu sonuç simülasyondur. Oto-onay sistemi kapalı olduğu için gerçek onay yapılmamıştır.</div>
+                                </div>
+                            )}
+
                             {/* Matched Bonus Rule */}
                             {ruleEvaluation?.matchedBonusRule && (
                                 <div className="summary-section bonus-rule">
@@ -912,12 +957,18 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                                 </div>
                             )}
 
-                            {/* No Rule Data */}
+                            {/* No Rule Data - Show debug info */}
                             {!ruleEvaluation && (
                                 <div className="summary-section no-data">
+                                    <div className="section-label">ℹ️ Kural Verisi</div>
                                     <div className="no-data-text">
                                         Kural değerlendirme verisi bulunamadı.
                                         Bu çekim eski bir snapshot ile oluşturulmuş olabilir.
+                                    </div>
+                                    <div className="debug-info" style={{ fontSize: '11px', marginTop: '8px', opacity: 0.7 }}>
+                                        <div>Çekim ID: {withdrawal?.Id}</div>
+                                        <div>Çevrim Tamamlandı: {turnover?.turnover?.isComplete ? 'Evet' : 'Hayır'}</div>
+                                        <div>DecisionData var: {turnover?.decisionData ? 'Evet' : 'Hayır'}</div>
                                     </div>
                                 </div>
                             )}
@@ -1313,6 +1364,19 @@ export default function CompactDetailPage({ withdrawal, onBack }) {
                 }
                 .rule-item.passed { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
                 .rule-item.failed { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+                
+                /* Turnover Summary */
+                .turnover-summary { background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); }
+                .turnover-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+                .turnover-stats .stat { display: flex; gap: 8px; align-items: center; }
+                .turnover-stats .label { color: var(--text-muted); font-size: 12px; }
+                .turnover-stats .value { font-weight: 600; font-size: 14px; color: var(--text-primary); }
+                .turnover-stats .value.complete { color: #22c55e; }
+                .turnover-stats .value.incomplete { color: #f59e0b; }
+                
+                /* Simulation Warning */
+                .simulation-warning { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); }
+                .simulation-text { font-size: 13px; color: #f59e0b; }
             `}</style>
         </div>
     );
